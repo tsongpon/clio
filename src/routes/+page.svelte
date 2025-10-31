@@ -100,7 +100,30 @@
     }
   }
 
-  function formatDate(date: Date): string {
+  function formatDate(dateString: string): string {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    // Less than 1 minute
+    if (diffMins < 1) return "just now";
+
+    // Less than 1 hour
+    if (diffMins < 60)
+      return `${diffMins} ${diffMins === 1 ? "minute" : "minutes"} ago`;
+
+    // Less than 24 hours
+    if (diffHours < 24)
+      return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
+
+    // Less than 7 days
+    if (diffDays < 7)
+      return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`;
+
+    // More than 7 days - show formatted date
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
       day: "numeric",
@@ -197,7 +220,7 @@
                   <span
                     class="text-xs text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded"
                   >
-                    {formatDate(bookmark.createdAt)}
+                    {formatDate(bookmark.created_at)}
                   </span>
                 </div>
               </div>
