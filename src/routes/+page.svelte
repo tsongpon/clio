@@ -28,10 +28,24 @@
     is_archived: boolean;
   }
 
+  interface PaginatedResponse {
+    bookmarks: BookmarkItem[];
+    page: number;
+    page_size: number;
+    total_count: number;
+    total_pages: number;
+  }
+
   let url = $state<string>("");
   let bookmarks = $state<BookmarkItem[]>([]);
   let showDropdown = $state<boolean>(false);
   let user = $state<any>(null);
+  let currentPage = $state<number>(1);
+  let totalPages = $state<number>(1);
+  let totalCount = $state<number>(0);
+  let pageSize = $state<number>(15);
+  let isLoading = $state<boolean>(false);
+  let hasMore = $state<boolean>(true);
 
   function handleAuthError(): void {
     // Clear invalid token
@@ -79,16 +93,26 @@
     // Add click outside listener
     document.addEventListener("click", handleClickOutside);
 
+    // Add scroll listener for infinite scroll
+    window.addEventListener("scroll", handleScroll);
+
     // Cleanup
     return () => {
       document.removeEventListener("click", handleClickOutside);
+      window.removeEventListener("scroll", handleScroll);
     };
   });
 
-  async function fetchBookmarks(): Promise<void> {
+  async function fetchBookmarks(
+    page: number = 1,
+    append: boolean = false,
+  ): Promise<void> {
+    if (isLoading) return;
+
+    isLoading = true;
     try {
       const response = await authenticatedFetch(
-        "http://localhost:1323/bookmarks?user_id=songpon&archived=false",
+        `http://localhost:1323/bookmarks?archived=false&page=${page}&page_size=${pageSize}`,
       );
 
       if (response.status === 401) {
@@ -101,11 +125,40 @@
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
-      bookmarks = data;
+      const data: PaginatedResponse = await response.json();
+
+      if (append) {
+        bookmarks = [...bookmarks, ...data.bookmarks];
+      } else {
+        bookmarks = data.bookmarks;
+      }
+
+      currentPage = data.page;
+      totalPages = data.total_pages;
+      totalCount = data.total_count;
+      hasMore = currentPage < totalPages;
     } catch (error) {
       console.error("Failed to fetch bookmarks:", error);
       // You might want to show an error message to the user here
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  function loadMoreBookmarks(): void {
+    if (hasMore && !isLoading) {
+      fetchBookmarks(currentPage + 1, true);
+    }
+  }
+
+  function handleScroll(): void {
+    const scrollableHeight =
+      document.documentElement.scrollHeight - window.innerHeight;
+    const scrolled = window.scrollY;
+
+    // Load more when user scrolls to bottom (with 100px threshold)
+    if (scrollableHeight - scrolled < 100) {
+      loadMoreBookmarks();
     }
   }
 
@@ -185,6 +238,32 @@
   function handleKeyPress(event: KeyboardEvent): void {
     if (event.key === "Enter") {
       addBookmark();
+    }
+  }
+
+  function isValidUrl(string: string): boolean {
+    try {
+      const urlPattern =
+        /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i;
+      return urlPattern.test(string.trim());
+    } catch {
+      return false;
+    }
+  }
+
+  async function handleFocus(): Promise<void> {
+    // Only auto-paste if the input is empty
+    if (url.trim()) return;
+
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      if (clipboardText && isValidUrl(clipboardText)) {
+        url = clipboardText.trim();
+      }
+    } catch (error) {
+      // Clipboard access might be denied or not available
+      // Silently fail - this is a nice-to-have feature
+      console.log("Clipboard access not available:", error);
     }
   }
 
@@ -296,6 +375,7 @@
           placeholder="Enter website URL (e.g., example.com)"
           bind:value={url}
           onkeypress={handleKeyPress}
+          onfocus={handleFocus}
           class="flex-1 h-10 rounded-lg"
         />
         <Button
@@ -313,7 +393,7 @@
         <span
           class="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium"
         >
-          {bookmarks.length}
+          {totalCount}
         </span>
       </div>
 
@@ -380,6 +460,28 @@
             </div>
           </div>
         {/each}
+      {/if}
+
+      <!-- Loading Indicator -->
+      {#if isLoading}
+        <div class="bg-white rounded-lg shadow p-6 mt-4">
+          <div class="flex items-center justify-center gap-3">
+            <div
+              class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"
+            ></div>
+            <span class="text-sm text-slate-600">Loading more bookmarks...</span
+            >
+          </div>
+        </div>
+      {/if}
+
+      <!-- End of List Indicator -->
+      {#if !hasMore && bookmarks.length > 0}
+        <div class="bg-white rounded-lg shadow p-4 mt-4">
+          <p class="text-center text-sm text-slate-500">
+            You've reached the end of your bookmarks
+          </p>
+        </div>
       {/if}
     </div>
   </div>
