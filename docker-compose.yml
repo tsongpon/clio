@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+    restart: unless-stopped
+
+  # Uncomment and configure when you have a backend API
+  # backend:
+  #   image: your-backend-image:latest
+  #   ports:
+  #     - "1323:1323"
+  #   environment:
+  #     - YOUR_ENV_VARS=value
+  #   restart: unless-stopped
