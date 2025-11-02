@@ -22,6 +22,7 @@
   interface BookmarkItem {
     id: string;
     url: string;
+    title: string;
     user_id: string;
     created_at: string;
     is_archived: boolean;
@@ -335,15 +336,18 @@
           >
             <div class="p-3 flex items-center justify-between gap-3">
               <div class="flex-1 min-w-0">
-                <div
-                  class="text-blue-600 text-sm font-medium flex items-center gap-2"
-                >
+                <div class="flex items-center gap-2 mb-1">
                   <ExternalLink
                     class="w-3.5 h-3.5 flex-shrink-0 text-slate-400"
                   />
-                  <span class="truncate">{bookmark.url}</span>
+                  <span class="text-base font-semibold text-slate-900 truncate">
+                    {bookmark.title || "Untitled Bookmark"}
+                  </span>
                 </div>
-                <div class="flex items-center gap-2 mt-1">
+                <p class="text-xs text-blue-600 truncate ml-5">
+                  {bookmark.url}
+                </p>
+                <div class="flex items-center gap-2 mt-1 ml-5">
                   <span
                     class="text-xs text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded"
                   >
