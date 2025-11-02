@@ -2,7 +2,22 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Card } from "$lib/components/ui/card";
-  import { Archive, ExternalLink, Bookmark } from "lucide-svelte";
+  import {
+    Archive,
+    ExternalLink,
+    Bookmark,
+    User,
+    LogOut,
+    Eye,
+  } from "lucide-svelte";
+  import {
+    authenticatedFetch,
+    isAuthenticated,
+    removeToken,
+    getUser,
+  } from "$lib/utils/auth";
+  import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
 
   interface BookmarkItem {
     id: string;
@@ -14,12 +29,72 @@
 
   let url = $state<string>("");
   let bookmarks = $state<BookmarkItem[]>([]);
+  let showDropdown = $state<boolean>(false);
+  let user = $state<any>(null);
+
+  function handleAuthError(): void {
+    // Clear invalid token
+    removeToken();
+    // Redirect to login
+    goto("/login");
+  }
+
+  function handleLogout(): void {
+    removeToken();
+    goto("/login");
+  }
+
+  function toggleDropdown(): void {
+    showDropdown = !showDropdown;
+  }
+
+  function closeDropdown(): void {
+    showDropdown = false;
+  }
+
+  function openBookmark(url: string): void {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  function handleClickOutside(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+    if (!target.closest(".user-dropdown")) {
+      closeDropdown();
+    }
+  }
+
+  onMount(() => {
+    // Check if user has a token
+    if (!isAuthenticated()) {
+      goto("/login");
+      return;
+    }
+
+    // Get user info
+    user = getUser();
+
+    fetchBookmarks();
+
+    // Add click outside listener
+    document.addEventListener("click", handleClickOutside);
+
+    // Cleanup
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  });
 
   async function fetchBookmarks(): Promise<void> {
     try {
-      const response = await fetch(
+      const response = await authenticatedFetch(
         "http://localhost:1323/bookmarks?user_id=songpon&archived=false",
       );
+
+      if (response.status === 401) {
+        // JWT authentication failed
+        handleAuthError();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -32,9 +107,6 @@
       // You might want to show an error message to the user here
     }
   }
-
-  // Fetch bookmarks when the component mounts
-  fetchBookmarks();
 
   async function addBookmark(): Promise<void> {
     if (!url.trim()) return;
@@ -54,13 +126,22 @@
     };
 
     try {
-      const response = await fetch("http://localhost:1323/bookmarks", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await authenticatedFetch(
+        "http://localhost:1323/bookmarks",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(newBookmark),
         },
-        body: JSON.stringify(newBookmark),
-      });
+      );
+
+      if (response.status === 401) {
+        // JWT authentication failed
+        handleAuthError();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -77,12 +158,18 @@
 
   async function archiveBookmark(id: string): Promise<void> {
     try {
-      const response = await fetch(
+      const response = await authenticatedFetch(
         `http://localhost:1323/bookmarks/${id}/archive`,
         {
           method: "POST",
         },
       );
+
+      if (response.status === 401) {
+        // JWT authentication failed
+        handleAuthError();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -137,15 +224,58 @@
 >
   <div class="mx-auto max-w-4xl">
     <div class="mb-4 bg-white rounded-lg shadow p-4">
-      <div class="flex items-center gap-2 mb-1">
-        <div class="bg-blue-600 p-2 rounded-lg">
-          <Bookmark class="w-5 h-5 text-white" />
+      <div class="flex items-center justify-between mb-1">
+        <div class="flex items-center gap-2">
+          <div class="bg-blue-600 p-2 rounded-lg">
+            <Bookmark class="w-5 h-5 text-white" />
+          </div>
+          <h1
+            class="text-balance text-2xl font-bold tracking-tight text-slate-900"
+          >
+            Bookmark Manager
+          </h1>
         </div>
-        <h1
-          class="text-balance text-2xl font-bold tracking-tight text-slate-900"
-        >
-          Bookmark Manager
-        </h1>
+
+        <!-- User Profile Dropdown -->
+        <div class="relative user-dropdown">
+          <button
+            onclick={toggleDropdown}
+            class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+            aria-label="User menu"
+          >
+            <div class="bg-blue-600 p-2 rounded-full">
+              <User class="w-4 h-4 text-white" />
+            </div>
+            {#if user?.name}
+              <span class="text-sm font-medium text-slate-700 hidden sm:block">
+                {user.name}
+              </span>
+            {/if}
+          </button>
+
+          {#if showDropdown}
+            <div
+              class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-10"
+            >
+              {#if user?.email}
+                <div class="px-4 py-2 border-b border-slate-200">
+                  <p class="text-xs text-slate-500">Signed in as</p>
+                  <p class="text-sm font-medium text-slate-900 truncate">
+                    {user.email}
+                  </p>
+                </div>
+              {/if}
+
+              <button
+                onclick={handleLogout}
+                class="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <LogOut class="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            </div>
+          {/if}
+        </div>
       </div>
       <p class="text-slate-600 text-sm ml-[44px]">
         Save and organize your favorite websites
@@ -205,17 +335,14 @@
           >
             <div class="p-3 flex items-center justify-between gap-3">
               <div class="flex-1 min-w-0">
-                <a
-                  href={bookmark.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-2 group transition-colors"
+                <div
+                  class="text-blue-600 text-sm font-medium flex items-center gap-2"
                 >
                   <ExternalLink
-                    class="w-3.5 h-3.5 flex-shrink-0 opacity-70 group-hover:opacity-100 transition-opacity"
+                    class="w-3.5 h-3.5 flex-shrink-0 text-slate-400"
                   />
                   <span class="truncate">{bookmark.url}</span>
-                </a>
+                </div>
                 <div class="flex items-center gap-2 mt-1">
                   <span
                     class="text-xs text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded"
@@ -225,14 +352,27 @@
                 </div>
               </div>
 
-              <Button
-                variant="ghost"
-                size="icon"
-                onclick={() => archiveBookmark(bookmark.id)}
-                class="flex-shrink-0 h-8 w-8 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
-              >
-                <Archive class="w-3.5 h-3.5" />
-              </Button>
+              <div class="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onclick={() => openBookmark(bookmark.url)}
+                  class="flex-shrink-0 h-8 w-8 rounded-full text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all"
+                  aria-label="Open bookmark"
+                >
+                  <Eye class="w-3.5 h-3.5" />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onclick={() => archiveBookmark(bookmark.id)}
+                  class="flex-shrink-0 h-8 w-8 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
+                  aria-label="Archive bookmark"
+                >
+                  <Archive class="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
           </div>
         {/each}
