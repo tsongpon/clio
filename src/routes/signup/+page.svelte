@@ -5,6 +5,7 @@
   import { Lock, Mail, UserPlus, User } from "lucide-svelte";
   import { goto } from "$app/navigation";
   import { setToken } from "$lib/utils/auth";
+  import { API_BASE_URL } from "$lib/config";
 
   let name = $state<string>("");
   let email = $state<string>("");
@@ -65,7 +66,7 @@
     errorMessage = "";
 
     try {
-      const response = await fetch("http://localhost:1323/users", {
+      const response = await fetch(`${API_BASE_URL}/users`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

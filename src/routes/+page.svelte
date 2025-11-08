@@ -18,6 +18,7 @@
   } from "$lib/utils/auth";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
+  import { API_BASE_URL } from "$lib/config";
 
   interface BookmarkItem {
     id: string;
@@ -112,7 +113,7 @@
     isLoading = true;
     try {
       const response = await authenticatedFetch(
-        `http://localhost:1323/bookmarks?archived=false&page=${page}&page_size=${pageSize}`,
+        `${API_BASE_URL}/bookmarks?archived=false&page=${page}&page_size=${pageSize}`,
       );
 
       if (response.status === 401) {
@@ -180,16 +181,13 @@
     };
 
     try {
-      const response = await authenticatedFetch(
-        "http://localhost:1323/bookmarks",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(newBookmark),
+      const response = await authenticatedFetch(`${API_BASE_URL}/bookmarks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(newBookmark),
+      });
 
       if (response.status === 401) {
         // JWT authentication failed
@@ -213,7 +211,7 @@
   async function archiveBookmark(id: string): Promise<void> {
     try {
       const response = await authenticatedFetch(
-        `http://localhost:1323/bookmarks/${id}/archive`,
+        `${API_BASE_URL}/bookmarks/${id}/archive`,
         {
           method: "POST",
         },

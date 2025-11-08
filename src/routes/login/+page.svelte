@@ -4,6 +4,7 @@
   import { Card } from "$lib/components/ui/card";
   import { Lock, Mail } from "lucide-svelte";
   import { goto } from "$app/navigation";
+  import { API_BASE_URL } from "$lib/config";
 
   let email = $state<string>("");
   let password = $state<string>("");
@@ -20,7 +21,7 @@
     errorMessage = "";
 
     try {
-      const response = await fetch("http://localhost:1323/login", {
+      const response = await fetch(`${API_BASE_URL}/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -57,7 +58,9 @@
     } catch (error) {
       console.error("Login failed:", error);
       errorMessage =
-        error instanceof Error ? error.message : "Login failed. Please try again.";
+        error instanceof Error
+          ? error.message
+          : "Login failed. Please try again.";
     } finally {
       isLoading = false;
     }
@@ -75,7 +78,9 @@
 >
   <div class="w-full max-w-md">
     <div class="text-center mb-8">
-      <div class="bg-blue-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+      <div
+        class="bg-blue-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
+      >
         <Lock class="w-8 h-8 text-white" />
       </div>
       <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-2">
@@ -85,7 +90,13 @@
     </div>
 
     <Card class="bg-white rounded-xl shadow-xl p-8">
-      <form onsubmit={(e) => { e.preventDefault(); handleLogin(); }} class="space-y-6">
+      <form
+        onsubmit={(e) => {
+          e.preventDefault();
+          handleLogin();
+        }}
+        class="space-y-6"
+      >
         <div>
           <label
             for="email"
@@ -94,7 +105,9 @@
             Email Address
           </label>
           <div class="relative">
-            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <div
+              class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
+            >
               <Mail class="h-5 w-5 text-slate-400" />
             </div>
             <Input
@@ -118,7 +131,9 @@
             Password
           </label>
           <div class="relative">
-            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <div
+              class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
+            >
               <Lock class="h-5 w-5 text-slate-400" />
             </div>
             <Input
