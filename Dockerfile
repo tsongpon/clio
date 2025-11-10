@@ -32,13 +32,13 @@ RUN npm ci --omit=dev
 # Copy built application from builder stage
 COPY --from=builder /app/build ./build
 
-# Expose port 3000
+# Expose port 3000 (Cloud Run will override this)
 EXPOSE 3000
 
 # Set environment variables
 ENV NODE_ENV=production
-ENV PORT=3000
 ENV HOST=0.0.0.0
 
 # Start the application
+# Cloud Run will provide PORT environment variable dynamically
 CMD ["node", "build"]

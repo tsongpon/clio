@@ -7,4 +7,4 @@
  * Backend API base URL
  * Change this value to point to a different backend environment
  */
-export const API_BASE_URL = "https://athena-app-4998fea3e11b.herokuapp.com";
+export const API_BASE_URL = "http://localhost:1323";
