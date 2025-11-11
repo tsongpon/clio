@@ -71,10 +71,6 @@ You can preview the production build with:
 npm run preview
 ```
 
-## Type Checking
-
-Run TypeScript and Svelte type checking:
-
 ```sh
 npm run check
 
