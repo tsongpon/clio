@@ -410,7 +410,16 @@
       {:else}
         {#each bookmarks as bookmark (bookmark.id)}
           <div
-            class="bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden"
+            class="bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer"
+            onclick={() => openBookmark(bookmark.url)}
+            role="link"
+            tabindex="0"
+            onkeydown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openBookmark(bookmark.url);
+              }
+            }}
           >
             <div class="p-3 flex items-center justify-between gap-3">
               <div class="flex-1 min-w-0">
@@ -438,17 +447,10 @@
                 <Button
                   variant="ghost"
                   size="icon"
-                  onclick={() => openBookmark(bookmark.url)}
-                  class="flex-shrink-0 h-8 w-8 rounded-full text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all"
-                  aria-label="Open bookmark"
-                >
-                  <Eye class="w-3.5 h-3.5" />
-                </Button>
-
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onclick={() => archiveBookmark(bookmark.id)}
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    archiveBookmark(bookmark.id);
+                  }}
                   class="flex-shrink-0 h-8 w-8 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
                   aria-label="Archive bookmark"
                 >
