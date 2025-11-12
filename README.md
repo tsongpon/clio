@@ -1,3 +1,5 @@
+[![CI/CD Pipeline](https://github.com/tsongpon/clio/actions/workflows/docker-build-push.yml/badge.svg)](https://github.com/tsongpon/clio/actions/workflows/docker-build-push.yml)
+
 # Clio - Bookmark Manager
 
 A modern bookmark management application built with SvelteKit and TypeScript. Save, organize, and manage your favorite websites with a clean and intuitive interface.
