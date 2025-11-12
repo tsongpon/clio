@@ -9,6 +9,7 @@
     User,
     LogOut,
     Eye,
+    Trash2,
   } from "lucide-svelte";
   import {
     authenticatedFetch,
@@ -260,6 +261,31 @@
     fetchBookmarks();
   }
 
+  async function deleteBookmark(id: string): Promise<void> {
+    try {
+      const response = await authenticatedFetch(
+        `${API_BASE_URL}/bookmarks/${id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      if (response.status === 401) {
+        // JWT authentication failed
+        handleAuthError();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error("Failed to delete bookmark:", error);
+      // You might want to show an error message to the user here
+    }
+    fetchBookmarks();
+  }
+
   function switchTab(tab: "toread" | "archive"): void {
     activeTab = tab;
     currentPage = 1;
@@ -405,7 +431,7 @@
         <Input
           id="bookmark-input"
           type="text"
-          placeholder="Enter website URL (e.g., example.com)"
+          placeholder="Enter website URL"
           bind:value={url}
           onkeypress={handleKeyPress}
           onfocus={handleFocus}
@@ -520,20 +546,19 @@
                   >
                     <Archive class="w-3.5 h-3.5" />
                   </Button>
-                {:else}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      unarchiveBookmark(bookmark.id);
-                    }}
-                    class="flex-shrink-0 h-8 w-8 rounded-full text-green-600 hover:text-green-700 hover:bg-green-50 transition-all"
-                    aria-label="Unarchive bookmark"
-                  >
-                    <Eye class="w-3.5 h-3.5" />
-                  </Button>
                 {/if}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    deleteBookmark(bookmark.id);
+                  }}
+                  class="flex-shrink-0 h-8 w-8 rounded-full text-red-600 hover:text-red-700 hover:bg-red-50 transition-all"
+                  aria-label="Delete bookmark"
+                >
+                  <Trash2 class="w-3.5 h-3.5" />
+                </Button>
               </div>
             </div>
           </div>
