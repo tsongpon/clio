@@ -47,6 +47,7 @@
   let pageSize = $state<number>(15);
   let isLoading = $state<boolean>(false);
   let hasMore = $state<boolean>(true);
+  let activeTab = $state<"toread" | "archive">("toread");
 
   function handleAuthError(): void {
     // Clear invalid token
@@ -111,9 +112,10 @@
     if (isLoading) return;
 
     isLoading = true;
+    const isArchived = activeTab === "archive";
     try {
       const response = await authenticatedFetch(
-        `${API_BASE_URL}/bookmarks?archived=false&page=${page}&page_size=${pageSize}`,
+        `${API_BASE_URL}/bookmarks?archived=${isArchived}&page=${page}&page_size=${pageSize}`,
       );
 
       if (response.status === 401) {
@@ -230,6 +232,39 @@
       console.error("Failed to archive bookmark:", error);
       // You might want to show an error message to the user here
     }
+    fetchBookmarks();
+  }
+
+  async function unarchiveBookmark(id: string): Promise<void> {
+    try {
+      const response = await authenticatedFetch(
+        `${API_BASE_URL}/bookmarks/${id}/unarchive`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (response.status === 401) {
+        // JWT authentication failed
+        handleAuthError();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error("Failed to unarchive bookmark:", error);
+      // You might want to show an error message to the user here
+    }
+    fetchBookmarks();
+  }
+
+  function switchTab(tab: "toread" | "archive"): void {
+    activeTab = tab;
+    currentPage = 1;
+    bookmarks = [];
+    hasMore = true;
     fetchBookmarks();
   }
 
@@ -386,8 +421,36 @@
     </div>
 
     <div class="space-y-2">
+      <!-- Tabs -->
+      <div class="bg-white rounded-lg shadow p-1 mb-4">
+        <div class="flex gap-1">
+          <button
+            onclick={() => switchTab("toread")}
+            class={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+              activeTab === "toread"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            To Read
+          </button>
+          <button
+            onclick={() => switchTab("archive")}
+            class={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+              activeTab === "archive"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Archive
+          </button>
+        </div>
+      </div>
+
       <div class="flex items-center justify-between mb-2">
-        <h2 class="text-lg font-semibold text-slate-900">Saved Bookmarks</h2>
+        <h2 class="text-lg font-semibold text-slate-900">
+          {activeTab === "toread" ? "To Read" : "Archived Bookmarks"}
+        </h2>
         <span
           class="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium"
         >
@@ -444,18 +507,33 @@
               </div>
 
               <div class="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    archiveBookmark(bookmark.id);
-                  }}
-                  class="flex-shrink-0 h-8 w-8 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
-                  aria-label="Archive bookmark"
-                >
-                  <Archive class="w-3.5 h-3.5" />
-                </Button>
+                {#if activeTab === "toread"}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      archiveBookmark(bookmark.id);
+                    }}
+                    class="flex-shrink-0 h-8 w-8 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
+                    aria-label="Archive bookmark"
+                  >
+                    <Archive class="w-3.5 h-3.5" />
+                  </Button>
+                {:else}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      unarchiveBookmark(bookmark.id);
+                    }}
+                    class="flex-shrink-0 h-8 w-8 rounded-full text-green-600 hover:text-green-700 hover:bg-green-50 transition-all"
+                    aria-label="Unarchive bookmark"
+                  >
+                    <Eye class="w-3.5 h-3.5" />
+                  </Button>
+                {/if}
               </div>
             </div>
           </div>
