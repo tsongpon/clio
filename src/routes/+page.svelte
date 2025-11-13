@@ -29,6 +29,7 @@
     created_at: string;
     is_archived: boolean;
     main_image_url?: string;
+    content_summary?: string;
   }
 
   interface PaginatedResponse {
@@ -511,13 +512,13 @@
               }
             }}
           >
-            <div class="p-4 flex items-center justify-between gap-4">
+            <div class="p-4 flex items-start justify-between gap-4">
               {#if bookmark.main_image_url}
                 <div class="flex-shrink-0 hidden md:block">
                   <img
                     src={bookmark.main_image_url}
                     alt={bookmark.title || "Bookmark image"}
-                    class="w-24 h-24 object-cover rounded-lg"
+                    class="w-40 h-32 object-cover rounded-lg"
                     onerror={(e) => {
                       e.currentTarget.style.display = "none";
                     }}
@@ -534,6 +535,11 @@
                 <p class="text-sm text-blue-600 truncate ml-6">
                   {bookmark.url}
                 </p>
+                {#if bookmark.content_summary}
+                  <p class="text-sm text-slate-600 mt-2 ml-6 line-clamp-3">
+                    {bookmark.content_summary}
+                  </p>
+                {/if}
                 <div class="flex items-center gap-2 mt-2 ml-6">
                   <span
                     class="text-sm text-slate-500 bg-slate-50 px-2 py-1 rounded"
