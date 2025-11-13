@@ -511,13 +511,13 @@
               }
             }}
           >
-            <div class="p-5 flex items-center justify-between gap-5">
+            <div class="p-4 flex items-center justify-between gap-4">
               {#if bookmark.main_image_url}
-                <div class="flex-shrink-0">
+                <div class="flex-shrink-0 hidden md:block">
                   <img
                     src={bookmark.main_image_url}
                     alt={bookmark.title || "Bookmark image"}
-                    class="w-28 h-28 object-cover rounded-lg"
+                    class="w-24 h-24 object-cover rounded-lg"
                     onerror={(e) => {
                       e.currentTarget.style.display = "none";
                     }}
@@ -526,17 +526,17 @@
               {/if}
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-2">
-                  <ExternalLink class="w-5 h-5 flex-shrink-0 text-slate-400" />
-                  <span class="text-xl font-semibold text-slate-900 truncate">
+                  <ExternalLink class="w-4 h-4 flex-shrink-0 text-slate-400" />
+                  <span class="text-lg font-semibold text-slate-900 truncate">
                     {bookmark.title || "Untitled Bookmark"}
                   </span>
                 </div>
-                <p class="text-base text-blue-600 truncate ml-7">
+                <p class="text-sm text-blue-600 truncate ml-6">
                   {bookmark.url}
                 </p>
-                <div class="flex items-center gap-2 mt-2 ml-7">
+                <div class="flex items-center gap-2 mt-2 ml-6">
                   <span
-                    class="text-base text-slate-500 bg-slate-50 px-2.5 py-1 rounded"
+                    class="text-sm text-slate-500 bg-slate-50 px-2 py-1 rounded"
                   >
                     {formatDate(bookmark.created_at)}
                   </span>
