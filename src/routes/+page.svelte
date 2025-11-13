@@ -28,6 +28,7 @@
     user_id: string;
     created_at: string;
     is_archived: boolean;
+    main_image_url?: string;
   }
 
   interface PaginatedResponse {
@@ -510,22 +511,32 @@
               }
             }}
           >
-            <div class="p-3 flex items-center justify-between gap-3">
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-1">
-                  <ExternalLink
-                    class="w-3.5 h-3.5 flex-shrink-0 text-slate-400"
+            <div class="p-5 flex items-center justify-between gap-5">
+              {#if bookmark.main_image_url}
+                <div class="flex-shrink-0">
+                  <img
+                    src={bookmark.main_image_url}
+                    alt={bookmark.title || "Bookmark image"}
+                    class="w-28 h-28 object-cover rounded-lg"
+                    onerror={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
                   />
-                  <span class="text-base font-semibold text-slate-900 truncate">
+                </div>
+              {/if}
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-2">
+                  <ExternalLink class="w-5 h-5 flex-shrink-0 text-slate-400" />
+                  <span class="text-xl font-semibold text-slate-900 truncate">
                     {bookmark.title || "Untitled Bookmark"}
                   </span>
                 </div>
-                <p class="text-xs text-blue-600 truncate ml-5">
+                <p class="text-base text-blue-600 truncate ml-7">
                   {bookmark.url}
                 </p>
-                <div class="flex items-center gap-2 mt-1 ml-5">
+                <div class="flex items-center gap-2 mt-2 ml-7">
                   <span
-                    class="text-xs text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded"
+                    class="text-base text-slate-500 bg-slate-50 px-2.5 py-1 rounded"
                   >
                     {formatDate(bookmark.created_at)}
                   </span>
