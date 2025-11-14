@@ -358,6 +358,15 @@
       year: "numeric",
     }).format(date);
   }
+
+  function extractDomain(url: string): string {
+    try {
+      const urlObject = new URL(url);
+      return urlObject.hostname;
+    } catch {
+      return url;
+    }
+  }
 </script>
 
 <div
@@ -512,70 +521,105 @@
               }
             }}
           >
-            <div class="p-4 flex items-start justify-between gap-4">
-              {#if bookmark.main_image_url}
-                <div class="flex-shrink-0 hidden md:block">
-                  <img
-                    src={bookmark.main_image_url}
-                    alt={bookmark.title || "Bookmark image"}
-                    class="w-40 h-32 object-cover rounded-lg"
-                    onerror={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                </div>
-              {/if}
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-2">
-                  <ExternalLink class="w-4 h-4 flex-shrink-0 text-slate-400" />
-                  <span class="text-lg font-semibold text-slate-900 truncate">
-                    {bookmark.title || "Untitled Bookmark"}
-                  </span>
-                </div>
-                <p class="text-sm text-blue-600 truncate ml-6">
-                  {bookmark.url}
-                </p>
-                {#if bookmark.content_summary}
-                  <p class="text-sm text-slate-600 mt-2 ml-6 line-clamp-3">
-                    {bookmark.content_summary}
-                  </p>
-                {/if}
-                <div class="flex items-center gap-2 mt-2 ml-6">
-                  <span
-                    class="text-sm text-slate-500 bg-slate-50 px-2 py-1 rounded"
+            <div class="p-4">
+              <div class="flex items-start gap-4">
+                {#if bookmark.main_image_url}
+                  <div
+                    class="flex-shrink-0 hidden md:flex md:flex-col md:justify-between"
                   >
-                    {formatDate(bookmark.created_at)}
-                  </span>
+                    <img
+                      src={bookmark.main_image_url}
+                      alt={bookmark.title || "Bookmark image"}
+                      class="w-40 h-32 object-cover rounded-lg"
+                      onerror={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                    <div class="flex items-center gap-1 justify-center mt-auto">
+                      {#if activeTab === "toread"}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onclick={(e) => {
+                            e.stopPropagation();
+                            archiveBookmark(bookmark.id);
+                          }}
+                          class="flex-shrink-0 h-9 w-9 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
+                          aria-label="Archive bookmark"
+                        >
+                          <Archive class="w-5 h-5" />
+                        </Button>
+                      {/if}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onclick={(e) => {
+                          e.stopPropagation();
+                          deleteBookmark(bookmark.id);
+                        }}
+                        class="flex-shrink-0 h-9 w-9 rounded-full text-red-600 hover:text-red-700 hover:bg-red-50 transition-all"
+                        aria-label="Delete bookmark"
+                      >
+                        <Trash2 class="w-5 h-5" />
+                      </Button>
+                    </div>
+                  </div>
+                {/if}
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-2">
+                    <ExternalLink
+                      class="w-4 h-4 flex-shrink-0 text-slate-400"
+                    />
+                    <span class="text-lg font-semibold text-slate-900 truncate">
+                      {bookmark.title || "Untitled Bookmark"}
+                    </span>
+                  </div>
+                  <p class="text-sm text-blue-600 truncate ml-6">
+                    {extractDomain(bookmark.url)}
+                  </p>
+                  {#if bookmark.content_summary}
+                    <p class="text-sm text-slate-600 mt-2 ml-6 leading-relaxed">
+                      {bookmark.content_summary.substring(0, 1000)}
+                    </p>
+                  {/if}
+                  <div class="flex items-center gap-2 mt-2 ml-6">
+                    <span
+                      class="text-sm text-slate-500 bg-slate-50 px-2 py-1 rounded"
+                    >
+                      {formatDate(bookmark.created_at)}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              <div class="flex items-center gap-1">
-                {#if activeTab === "toread"}
+                <!-- Mobile buttons - show on mobile only -->
+                <div class="flex md:hidden items-center gap-1">
+                  {#if activeTab === "toread"}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        archiveBookmark(bookmark.id);
+                      }}
+                      class="flex-shrink-0 h-9 w-9 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
+                      aria-label="Archive bookmark"
+                    >
+                      <Archive class="w-5 h-5" />
+                    </Button>
+                  {/if}
                   <Button
                     variant="ghost"
                     size="icon"
                     onclick={(e) => {
                       e.stopPropagation();
-                      archiveBookmark(bookmark.id);
+                      deleteBookmark(bookmark.id);
                     }}
-                    class="flex-shrink-0 h-8 w-8 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
-                    aria-label="Archive bookmark"
+                    class="flex-shrink-0 h-9 w-9 rounded-full text-red-600 hover:text-red-700 hover:bg-red-50 transition-all"
+                    aria-label="Delete bookmark"
                   >
-                    <Archive class="w-3.5 h-3.5" />
+                    <Trash2 class="w-5 h-5" />
                   </Button>
-                {/if}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    deleteBookmark(bookmark.id);
-                  }}
-                  class="flex-shrink-0 h-8 w-8 rounded-full text-red-600 hover:text-red-700 hover:bg-red-50 transition-all"
-                  aria-label="Delete bookmark"
-                >
-                  <Trash2 class="w-3.5 h-3.5" />
-                </Button>
+                </div>
               </div>
             </div>
           </div>
