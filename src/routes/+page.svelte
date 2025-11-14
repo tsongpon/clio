@@ -52,6 +52,7 @@
   let isLoading = $state<boolean>(false);
   let hasMore = $state<boolean>(true);
   let activeTab = $state<"toread" | "archive">("toread");
+  let isAddingBookmark = $state<boolean>(false);
 
   function handleAuthError(): void {
     // Clear invalid token
@@ -170,7 +171,7 @@
   }
 
   async function addBookmark(): Promise<void> {
-    if (!url.trim()) return;
+    if (!url.trim() || isAddingBookmark) return;
 
     // Basic URL validation
     let formattedUrl: string = url.trim();
@@ -185,6 +186,8 @@
       user_id: "songpon",
       url: formattedUrl,
     };
+
+    isAddingBookmark = true;
 
     try {
       const response = await authenticatedFetch(`${API_BASE_URL}/bookmarks`, {
@@ -211,6 +214,8 @@
     } catch (error) {
       console.error("Failed to add bookmark:", error);
       // You might want to show an error message to the user here
+    } finally {
+      isAddingBookmark = false;
     }
   }
 
@@ -448,12 +453,23 @@
           onkeypress={handleKeyPress}
           onfocus={handleFocus}
           class="flex-1 h-10 rounded-lg"
+          disabled={isAddingBookmark}
         />
         <Button
           onclick={addBookmark}
-          class="h-10 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium"
+          disabled={isAddingBookmark}
+          class="h-10 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Add
+          {#if isAddingBookmark}
+            <div class="flex items-center gap-2">
+              <div
+                class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"
+              ></div>
+              <span>Adding...</span>
+            </div>
+          {:else}
+            Add
+          {/if}
         </Button>
       </div>
     </div>
