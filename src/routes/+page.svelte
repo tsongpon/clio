@@ -48,7 +48,7 @@
   let currentPage = $state<number>(1);
   let totalPages = $state<number>(1);
   let totalCount = $state<number>(0);
-  let pageSize = $state<number>(15);
+  let pageSize = $state<number>(12);
   let isLoading = $state<boolean>(false);
   let hasMore = $state<boolean>(true);
   let activeTab = $state<"toread" | "archive">("toread");
@@ -378,7 +378,7 @@
 <div
   class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-3 md:p-4"
 >
-  <div class="mx-auto max-w-4xl">
+  <div class="mx-auto max-w-7xl">
     <div class="mb-4 bg-white rounded-lg shadow p-4">
       <div class="flex items-center justify-between mb-1">
         <div class="flex items-center gap-2">
@@ -525,120 +525,129 @@
           </p>
         </div>
       {:else}
-        {#each bookmarks as bookmark (bookmark.id)}
-          <div
-            class="bg-white rounded-lg shadow hover:shadow-md transition-shadow overflow-hidden cursor-pointer"
-            onclick={() => openBookmark(bookmark.url)}
-            role="link"
-            tabindex="0"
-            onkeydown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                openBookmark(bookmark.url);
-              }
-            }}
-          >
-            <div class="p-4">
-              <div class="flex items-start gap-4">
-                <div
-                  class="flex-shrink-0 hidden md:flex md:flex-col md:justify-between"
-                >
-                  <img
-                    src={bookmark.main_image_url || placeholderImage}
-                    alt={bookmark.title || "Bookmark image"}
-                    class="w-40 h-32 object-cover rounded-lg"
-                    onerror={(e) => {
-                      e.currentTarget.src = placeholderImage;
-                    }}
-                  />
-                  <div class="flex items-center gap-1 justify-center mt-auto">
-                    {#if activeTab === "toread"}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onclick={(e) => {
-                          e.stopPropagation();
-                          archiveBookmark(bookmark.id);
-                        }}
-                        class="flex-shrink-0 h-9 w-9 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
-                        aria-label="Archive bookmark"
-                      >
-                        <Archive class="w-5 h-5" />
-                      </Button>
-                    {/if}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        deleteBookmark(bookmark.id);
-                      }}
-                      class="flex-shrink-0 h-9 w-9 rounded-full text-red-600 hover:text-red-700 hover:bg-red-50 transition-all"
-                      aria-label="Delete bookmark"
-                    >
-                      <Trash2 class="w-5 h-5" />
-                    </Button>
-                  </div>
-                </div>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 mb-2">
-                    <ExternalLink
-                      class="w-4 h-4 flex-shrink-0 text-slate-400"
-                    />
-                    <span class="text-lg font-semibold text-slate-900 truncate">
-                      {bookmark.title || "Untitled Bookmark"}
-                    </span>
-                  </div>
-                  <p class="text-sm text-blue-600 truncate ml-6">
-                    {extractDomain(bookmark.url)}
-                  </p>
-                  {#if bookmark.content_summary}
-                    <p class="text-sm text-slate-600 mt-2 ml-6 leading-relaxed">
-                      {bookmark.content_summary.substring(0, 1000)}
-                    </p>
-                  {/if}
-                  <div class="flex items-center gap-2 mt-2 ml-6">
-                    <span
-                      class="text-sm text-slate-500 bg-slate-50 px-2 py-1 rounded"
-                    >
-                      {formatDate(bookmark.created_at)}
-                    </span>
-                  </div>
-                </div>
+        <!-- 3-Column Card Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {#each bookmarks as bookmark (bookmark.id)}
+            <div
+              class="bg-white rounded-lg shadow hover:shadow-lg transition-all overflow-hidden flex flex-col"
+            >
+              <!-- Main Image on Top -->
+              <div
+                class="w-full h-48 overflow-hidden cursor-pointer"
+                onclick={() => openBookmark(bookmark.url)}
+                role="button"
+                tabindex="0"
+                onkeydown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openBookmark(bookmark.url);
+                  }
+                }}
+              >
+                <img
+                  src={bookmark.main_image_url || placeholderImage}
+                  alt={bookmark.title || "Bookmark image"}
+                  class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  onerror={(e) => {
+                    e.currentTarget.src = placeholderImage;
+                  }}
+                />
+              </div>
 
-                <!-- Mobile buttons - show on mobile only -->
-                <div class="flex md:hidden items-center gap-1">
+              <!-- Date Below Image -->
+              <div class="px-4 pt-3 pb-2">
+                <span class="text-xs text-slate-500">
+                  {formatDate(bookmark.created_at)}
+                </span>
+              </div>
+
+              <!-- Card Content -->
+              <div class="px-4 pb-4 flex-1 flex flex-col">
+                <!-- Title -->
+                <h3
+                  class="text-lg font-semibold text-slate-900 mb-2 line-clamp-2 cursor-pointer hover:text-blue-600 transition-colors"
+                  onclick={() => openBookmark(bookmark.url)}
+                  role="button"
+                  tabindex="0"
+                  onkeydown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openBookmark(bookmark.url);
+                    }
+                  }}
+                >
+                  {bookmark.title || "Untitled Bookmark"}
+                </h3>
+
+                <!-- Domain -->
+                <p
+                  class="text-xs text-blue-600 mb-3 truncate flex items-center gap-1"
+                >
+                  <ExternalLink class="w-3 h-3 flex-shrink-0" />
+                  {extractDomain(bookmark.url)}
+                </p>
+
+                <!-- Content Summary -->
+                {#if bookmark.content_summary}
+                  <p class="text-sm text-slate-600 mb-4 line-clamp-3 flex-1">
+                    {bookmark.content_summary.substring(0, 200)}{bookmark
+                      .content_summary.length > 200
+                      ? "..."
+                      : ""}
+                  </p>
+                {/if}
+
+                <!-- Action Buttons at Bottom -->
+                <div
+                  class="flex items-center gap-2 mt-auto pt-3 border-t border-slate-100"
+                >
                   {#if activeTab === "toread"}
                     <Button
                       variant="ghost"
-                      size="icon"
+                      size="sm"
                       onclick={(e) => {
                         e.stopPropagation();
                         archiveBookmark(bookmark.id);
                       }}
-                      class="flex-shrink-0 h-9 w-9 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
+                      class="flex-1 h-9 text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
                       aria-label="Archive bookmark"
                     >
-                      <Archive class="w-5 h-5" />
+                      <Archive class="w-4 h-4 mr-1" />
+                      Archive
+                    </Button>
+                  {:else}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        unarchiveBookmark(bookmark.id);
+                      }}
+                      class="flex-1 h-9 text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
+                      aria-label="Unarchive bookmark"
+                    >
+                      <Archive class="w-4 h-4 mr-1" />
+                      Unarchive
                     </Button>
                   {/if}
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="sm"
                     onclick={(e) => {
                       e.stopPropagation();
                       deleteBookmark(bookmark.id);
                     }}
-                    class="flex-shrink-0 h-9 w-9 rounded-full text-red-600 hover:text-red-700 hover:bg-red-50 transition-all"
+                    class="flex-1 h-9 text-red-600 hover:text-red-700 hover:bg-red-50 transition-all"
                     aria-label="Delete bookmark"
                   >
-                    <Trash2 class="w-5 h-5" />
+                    <Trash2 class="w-4 h-4 mr-1" />
+                    Delete
                   </Button>
                 </div>
               </div>
             </div>
-          </div>
-        {/each}
+          {/each}
+        </div>
       {/if}
 
       <!-- Loading Indicator -->
