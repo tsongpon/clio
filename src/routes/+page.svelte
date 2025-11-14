@@ -318,22 +318,6 @@
     }
   }
 
-  async function handleFocus(): Promise<void> {
-    // Only auto-paste if the input is empty
-    if (url.trim()) return;
-
-    try {
-      const clipboardText = await navigator.clipboard.readText();
-      if (clipboardText && isValidUrl(clipboardText)) {
-        url = clipboardText.trim();
-      }
-    } catch (error) {
-      // Clipboard access might be denied or not available
-      // Silently fail - this is a nice-to-have feature
-      console.log("Clipboard access not available:", error);
-    }
-  }
-
   function formatDate(dateString: string): string {
     const date = new Date(dateString);
     const now = new Date();
@@ -451,7 +435,6 @@
           placeholder="Enter website URL"
           bind:value={url}
           onkeypress={handleKeyPress}
-          onfocus={handleFocus}
           class="flex-1 h-10 rounded-lg"
           disabled={isAddingBookmark}
         />
