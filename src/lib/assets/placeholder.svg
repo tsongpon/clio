@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="128" viewBox="0 0 160 128">
+  <!-- Background -->
+  <rect width="160" height="128" fill="#f1f5f9"/>
+
+  <!-- Image icon -->
+  <g transform="translate(55, 39)">
+    <!-- Mountain/landscape icon -->
+    <path d="M5 35 L20 15 L35 30 L50 5 L50 50 L5 50 Z" fill="#cbd5e1" stroke="none"/>
+
+    <!-- Sun/circle -->
+    <circle cx="15" cy="15" r="6" fill="#94a3b8"/>
+  </g>
+
+  <!-- Text -->
+  <text x="80" y="85" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">
+    No Preview
+  </text>
+</svg>

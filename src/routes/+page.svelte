@@ -20,6 +20,7 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { API_BASE_URL } from "$lib/config";
+  import placeholderImage from "$lib/assets/placeholder.svg";
 
   interface BookmarkItem {
     id: string;
@@ -523,48 +524,46 @@
           >
             <div class="p-4">
               <div class="flex items-start gap-4">
-                {#if bookmark.main_image_url}
-                  <div
-                    class="flex-shrink-0 hidden md:flex md:flex-col md:justify-between"
-                  >
-                    <img
-                      src={bookmark.main_image_url}
-                      alt={bookmark.title || "Bookmark image"}
-                      class="w-40 h-32 object-cover rounded-lg"
-                      onerror={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                    <div class="flex items-center gap-1 justify-center mt-auto">
-                      {#if activeTab === "toread"}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onclick={(e) => {
-                            e.stopPropagation();
-                            archiveBookmark(bookmark.id);
-                          }}
-                          class="flex-shrink-0 h-9 w-9 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
-                          aria-label="Archive bookmark"
-                        >
-                          <Archive class="w-5 h-5" />
-                        </Button>
-                      {/if}
+                <div
+                  class="flex-shrink-0 hidden md:flex md:flex-col md:justify-between"
+                >
+                  <img
+                    src={bookmark.main_image_url || placeholderImage}
+                    alt={bookmark.title || "Bookmark image"}
+                    class="w-40 h-32 object-cover rounded-lg"
+                    onerror={(e) => {
+                      e.currentTarget.src = placeholderImage;
+                    }}
+                  />
+                  <div class="flex items-center gap-1 justify-center mt-auto">
+                    {#if activeTab === "toread"}
                       <Button
                         variant="ghost"
                         size="icon"
                         onclick={(e) => {
                           e.stopPropagation();
-                          deleteBookmark(bookmark.id);
+                          archiveBookmark(bookmark.id);
                         }}
-                        class="flex-shrink-0 h-9 w-9 rounded-full text-red-600 hover:text-red-700 hover:bg-red-50 transition-all"
-                        aria-label="Delete bookmark"
+                        class="flex-shrink-0 h-9 w-9 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
+                        aria-label="Archive bookmark"
                       >
-                        <Trash2 class="w-5 h-5" />
+                        <Archive class="w-5 h-5" />
                       </Button>
-                    </div>
+                    {/if}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        deleteBookmark(bookmark.id);
+                      }}
+                      class="flex-shrink-0 h-9 w-9 rounded-full text-red-600 hover:text-red-700 hover:bg-red-50 transition-all"
+                      aria-label="Delete bookmark"
+                    >
+                      <Trash2 class="w-5 h-5" />
+                    </Button>
                   </div>
-                {/if}
+                </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 mb-2">
                     <ExternalLink
