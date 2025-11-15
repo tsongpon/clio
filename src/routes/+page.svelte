@@ -423,11 +423,6 @@
     </div>
 
     <div class="bg-white rounded-lg shadow p-4 mb-4">
-      <label
-        for="bookmark-input"
-        class="block text-sm font-medium text-slate-700 mb-2"
-        >Add New Bookmark</label
-      >
       <div class="flex gap-2">
         <Input
           id="bookmark-input"
@@ -509,7 +504,7 @@
         </div>
       {:else}
         <!-- 3-Column Card Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {#each bookmarks as bookmark (bookmark.id)}
             <div
               class="bg-white rounded-lg shadow hover:shadow-lg transition-all overflow-hidden flex flex-col"
@@ -597,20 +592,6 @@
                     >
                       <Archive class="w-4 h-4 mr-1" />
                       Archive
-                    </Button>
-                  {:else}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        unarchiveBookmark(bookmark.id);
-                      }}
-                      class="flex-1 h-9 text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-all"
-                      aria-label="Unarchive bookmark"
-                    >
-                      <Archive class="w-4 h-4 mr-1" />
-                      Unarchive
                     </Button>
                   {/if}
                   <Button
