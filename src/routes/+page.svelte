@@ -59,6 +59,7 @@
   }
 
   let url = $state<string>("");
+  let feedUrl = $state<string>("");
   let bookmarks = $state<BookmarkItem[]>([]);
   let showDropdown = $state<boolean>(false);
   let user = $state<any>(null);
@@ -70,6 +71,7 @@
   let hasMore = $state<boolean>(true);
   let activeTab = $state<"toread" | "archive" | "feed">("feed");
   let isAddingBookmark = $state<boolean>(false);
+  let isAddingFeed = $state<boolean>(false);
   let feeds = $state<FeedItem[]>([]);
   let feedCurrentPage = $state<number>(1);
   let feedTotalPages = $state<number>(1);
@@ -316,6 +318,53 @@
     }
   }
 
+  async function addFeedUrl(): Promise<void> {
+    if (!feedUrl.trim() || isAddingFeed) return;
+
+    // Basic URL validation
+    let formattedUrl: string = feedUrl.trim();
+    if (
+      !formattedUrl.startsWith("http://") &&
+      !formattedUrl.startsWith("https://")
+    ) {
+      formattedUrl = "https://" + formattedUrl;
+    }
+
+    isAddingFeed = true;
+
+    try {
+      const response = await authenticatedFetch(`${API_BASE_URL}/addfeedurl`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ feed_url: formattedUrl }),
+      });
+
+      if (response.status === 401) {
+        // JWT authentication failed
+        handleAuthError();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      feedUrl = "";
+      // Refresh feeds after adding new feed URL
+      feedCurrentPage = 1;
+      feeds = [];
+      feedHasMore = true;
+      fetchFeeds();
+    } catch (error) {
+      console.error("Failed to add feed URL:", error);
+      // You might want to show an error message to the user here
+    } finally {
+      isAddingFeed = false;
+    }
+  }
+
   async function archiveBookmark(id: string): Promise<void> {
     try {
       const response = await authenticatedFetch(
@@ -526,36 +575,6 @@
       </p>
     </div>
 
-    <div class="bg-white rounded-lg shadow p-4 mb-4">
-      <div class="flex gap-2">
-        <Input
-          id="bookmark-input"
-          type="text"
-          placeholder="Enter website URL"
-          bind:value={url}
-          onkeypress={handleKeyPress}
-          class="flex-1 h-10 rounded-lg"
-          disabled={isAddingBookmark}
-        />
-        <Button
-          onclick={addBookmark}
-          disabled={isAddingBookmark}
-          class="h-10 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {#if isAddingBookmark}
-            <div class="flex items-center gap-2">
-              <div
-                class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"
-              ></div>
-              <span>Adding...</span>
-            </div>
-          {:else}
-            Add
-          {/if}
-        </Button>
-      </div>
-    </div>
-
     <div class="space-y-2">
       <!-- Tabs -->
       <div class="bg-white rounded-lg shadow p-1 mb-4">
@@ -592,6 +611,76 @@
           </button>
         </div>
       </div>
+
+      <!-- Add Feed URL Box - Only show on Feed tab -->
+      {#if activeTab === "feed"}
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+          <div class="flex gap-2">
+            <Input
+              id="feed-url-input"
+              type="text"
+              placeholder="Enter RSS feed URL"
+              bind:value={feedUrl}
+              onkeypress={(e) => {
+                if (e.key === "Enter") {
+                  addFeedUrl();
+                }
+              }}
+              class="flex-1 h-10 rounded-lg"
+              disabled={isAddingFeed}
+            />
+            <Button
+              onclick={addFeedUrl}
+              disabled={isAddingFeed}
+              class="h-10 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {#if isAddingFeed}
+                <div class="flex items-center gap-2">
+                  <div
+                    class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"
+                  ></div>
+                  <span>Adding...</span>
+                </div>
+              {:else}
+                Subscribe
+              {/if}
+            </Button>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Add Bookmark Box - Only show on To Read tab -->
+      {#if activeTab === "toread"}
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+          <div class="flex gap-2">
+            <Input
+              id="bookmark-input"
+              type="text"
+              placeholder="Enter website URL"
+              bind:value={url}
+              onkeypress={handleKeyPress}
+              class="flex-1 h-10 rounded-lg"
+              disabled={isAddingBookmark}
+            />
+            <Button
+              onclick={addBookmark}
+              disabled={isAddingBookmark}
+              class="h-10 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {#if isAddingBookmark}
+                <div class="flex items-center gap-2">
+                  <div
+                    class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"
+                  ></div>
+                  <span>Adding...</span>
+                </div>
+              {:else}
+                Add
+              {/if}
+            </Button>
+          </div>
+        </div>
+      {/if}
 
       <div class="flex items-center justify-between mb-2">
         <h2 class="text-lg font-semibold text-slate-900">
