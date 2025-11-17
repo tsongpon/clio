@@ -41,6 +41,23 @@
     total_pages: number;
   }
 
+  interface FeedItem {
+    title: string;
+    main_image_url: string;
+    link: string;
+    description: string;
+    guid: string;
+    published_at: string;
+  }
+
+  interface FeedResponse {
+    feeds: FeedItem[];
+    page: number;
+    page_size: number;
+    total_count: number;
+    total_pages: number;
+  }
+
   let url = $state<string>("");
   let bookmarks = $state<BookmarkItem[]>([]);
   let showDropdown = $state<boolean>(false);
@@ -51,8 +68,13 @@
   let pageSize = $state<number>(12);
   let isLoading = $state<boolean>(false);
   let hasMore = $state<boolean>(true);
-  let activeTab = $state<"toread" | "archive">("toread");
+  let activeTab = $state<"toread" | "archive" | "feed">("feed");
   let isAddingBookmark = $state<boolean>(false);
+  let feeds = $state<FeedItem[]>([]);
+  let feedCurrentPage = $state<number>(1);
+  let feedTotalPages = $state<number>(1);
+  let feedTotalCount = $state<number>(0);
+  let feedHasMore = $state<boolean>(true);
 
   function handleAuthError(): void {
     // Clear invalid token
@@ -95,7 +117,7 @@
     // Get user info
     user = getUser();
 
-    fetchBookmarks();
+    fetchFeeds();
 
     // Add click outside listener
     document.addEventListener("click", handleClickOutside);
@@ -153,9 +175,80 @@
     }
   }
 
+  async function fetchFeeds(
+    page: number = 1,
+    append: boolean = false,
+  ): Promise<void> {
+    if (isLoading) return;
+
+    isLoading = true;
+    try {
+      const response = await authenticatedFetch(
+        `${API_BASE_URL}/feeds?page=${page}&page_size=${pageSize}`,
+      );
+
+      if (response.status === 401) {
+        // JWT authentication failed
+        handleAuthError();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Check if response has pagination structure or is just an array
+      if (Array.isArray(data)) {
+        // Response is a simple array
+        if (append) {
+          feeds = [...feeds, ...data];
+        } else {
+          feeds = data;
+        }
+        feedCurrentPage = page;
+        feedTotalCount = data.length;
+        feedTotalPages = 1;
+        feedHasMore = false;
+      } else {
+        // Response has pagination structure
+        if (append) {
+          feeds = [...feeds, ...data.feeds];
+        } else {
+          feeds = data.feeds;
+        }
+        feedCurrentPage = data.page || page;
+        feedTotalCount = data.total_count || 0;
+
+        // Calculate total_pages if not provided
+        const pageSize = data.page_size || 24;
+        feedTotalPages =
+          data.total_pages || Math.ceil(feedTotalCount / pageSize);
+
+        // Check if there are more items to load
+        feedHasMore =
+          data.feeds &&
+          data.feeds.length >= pageSize &&
+          feedCurrentPage < feedTotalPages;
+      }
+    } catch (error) {
+      console.error("Failed to fetch feeds:", error);
+      // You might want to show an error message to the user here
+    } finally {
+      isLoading = false;
+    }
+  }
+
   function loadMoreBookmarks(): void {
     if (hasMore && !isLoading) {
       fetchBookmarks(currentPage + 1, true);
+    }
+  }
+
+  function loadMoreFeeds(): void {
+    if (feedHasMore && !isLoading) {
+      fetchFeeds(feedCurrentPage + 1, true);
     }
   }
 
@@ -166,7 +259,11 @@
 
     // Load more when user scrolls to bottom (with 100px threshold)
     if (scrollableHeight - scrolled < 100) {
-      loadMoreBookmarks();
+      if (activeTab === "feed") {
+        loadMoreFeeds();
+      } else {
+        loadMoreBookmarks();
+      }
     }
   }
 
@@ -294,12 +391,19 @@
     fetchBookmarks();
   }
 
-  function switchTab(tab: "toread" | "archive"): void {
+  function switchTab(tab: "toread" | "archive" | "feed"): void {
     activeTab = tab;
-    currentPage = 1;
-    bookmarks = [];
-    hasMore = true;
-    fetchBookmarks();
+    if (tab === "feed") {
+      feedCurrentPage = 1;
+      feeds = [];
+      feedHasMore = true;
+      fetchFeeds();
+    } else {
+      currentPage = 1;
+      bookmarks = [];
+      hasMore = true;
+      fetchBookmarks();
+    }
   }
 
   function handleKeyPress(event: KeyboardEvent): void {
@@ -457,6 +561,16 @@
       <div class="bg-white rounded-lg shadow p-1 mb-4">
         <div class="flex gap-1">
           <button
+            onclick={() => switchTab("feed")}
+            class={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+              activeTab === "feed"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Feed
+          </button>
+          <button
             onclick={() => switchTab("toread")}
             class={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
               activeTab === "toread"
@@ -481,16 +595,113 @@
 
       <div class="flex items-center justify-between mb-2">
         <h2 class="text-lg font-semibold text-slate-900">
-          {activeTab === "toread" ? "To Read" : "Archived Bookmarks"}
+          {activeTab === "toread"
+            ? "To Read"
+            : activeTab === "archive"
+              ? "Archived Bookmarks"
+              : "Feed"}
         </h2>
         <span
           class="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium"
         >
-          {totalCount}
+          {activeTab === "feed" ? feedTotalCount : totalCount}
         </span>
       </div>
 
-      {#if bookmarks.length === 0}
+      {#if activeTab === "feed"}
+        <!-- Feed Tab Content -->
+        {#if feeds.length === 0}
+          <div class="bg-white rounded-lg shadow p-8 text-center">
+            <div
+              class="bg-slate-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+            >
+              <Bookmark class="w-6 h-6 text-slate-400" />
+            </div>
+            <p class="text-slate-600 font-medium text-sm">No feeds yet</p>
+            <p class="text-slate-400 text-xs mt-1">
+              Check back later for updates!
+            </p>
+          </div>
+        {:else}
+          <!-- Feed Card Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {#each feeds as feed (feed.guid)}
+              <div
+                class="bg-white rounded-lg shadow hover:shadow-lg transition-all overflow-hidden flex flex-col"
+              >
+                <!-- Main Image on Top -->
+                <div
+                  class="w-full h-48 overflow-hidden cursor-pointer"
+                  onclick={() => openBookmark(feed.link)}
+                  role="button"
+                  tabindex="0"
+                  onkeydown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openBookmark(feed.link);
+                    }
+                  }}
+                >
+                  <img
+                    src={feed.main_image_url || placeholderImage}
+                    alt={feed.title || "Feed image"}
+                    class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                    onerror={(e) => {
+                      e.currentTarget.src = placeholderImage;
+                    }}
+                  />
+                </div>
+
+                <!-- Date Below Image -->
+                <div class="px-4 pt-3 pb-2">
+                  <span class="text-xs text-slate-500">
+                    {formatDate(feed.published_at)}
+                  </span>
+                </div>
+
+                <!-- Card Content -->
+                <div class="px-4 pb-4 flex-1 flex flex-col">
+                  <!-- Title -->
+                  <h3
+                    class="text-lg font-semibold text-slate-900 mb-2 line-clamp-2 cursor-pointer hover:text-blue-600 transition-colors"
+                    onclick={() => openBookmark(feed.link)}
+                    role="button"
+                    tabindex="0"
+                    onkeydown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openBookmark(feed.link);
+                      }
+                    }}
+                  >
+                    {feed.title || "Untitled Feed"}
+                  </h3>
+
+                  <!-- Feed Source -->
+                  <p
+                    class="text-xs text-blue-600 mb-3 truncate flex items-center gap-1"
+                  >
+                    <ExternalLink class="w-3 h-3 flex-shrink-0" />
+                    {extractDomain(feed.link)}
+                  </p>
+
+                  <!-- Description -->
+                  {#if feed.description}
+                    <div
+                      class="text-sm text-slate-600 mb-4 line-clamp-3 flex-1"
+                    >
+                      {@html feed.description.substring(0, 200)}{feed
+                        .description.length > 200
+                        ? "..."
+                        : ""}
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      {:else if bookmarks.length === 0}
         <div class="bg-white rounded-lg shadow p-8 text-center">
           <div
             class="bg-slate-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
@@ -621,14 +832,23 @@
             <div
               class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"
             ></div>
-            <span class="text-sm text-slate-600">Loading more bookmarks...</span
-            >
+            <span class="text-sm text-slate-600">
+              {activeTab === "feed"
+                ? "Loading more feeds..."
+                : "Loading more bookmarks..."}
+            </span>
           </div>
         </div>
       {/if}
 
       <!-- End of List Indicator -->
-      {#if !hasMore && bookmarks.length > 0}
+      {#if activeTab === "feed" && !feedHasMore && feeds.length > 0}
+        <div class="bg-white rounded-lg shadow p-4 mt-4">
+          <p class="text-center text-sm text-slate-500">
+            You've reached the end of your feeds
+          </p>
+        </div>
+      {:else if activeTab !== "feed" && !hasMore && bookmarks.length > 0}
         <div class="bg-white rounded-lg shadow p-4 mt-4">
           <p class="text-center text-sm text-slate-500">
             You've reached the end of your bookmarks
