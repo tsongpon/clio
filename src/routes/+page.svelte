@@ -35,10 +35,8 @@
 
   interface PaginatedResponse {
     bookmarks: BookmarkItem[];
-    page: number;
-    page_size: number;
-    total_count: number;
-    total_pages: number;
+    next_cursor: string | null;
+    has_more: boolean;
   }
 
   interface FeedItem {
@@ -61,18 +59,16 @@
   let bookmarks = $state<BookmarkItem[]>([]);
   let showDropdown = $state<boolean>(false);
   let user = $state<any>(null);
-  let currentPage = $state<number>(1);
-  let totalPages = $state<number>(1);
-  let totalCount = $state<number>(0);
-  let pageSize = $state<number>(24);
-  let isLoading = $state<boolean>(false);
+  let bookmarkNextCursor = $state<string | null>(null);
   let hasMore = $state<boolean>(true);
+  let isLoading = $state<boolean>(false);
   let activeTab = $state<"toread" | "archive" | "feed">("feed");
   let isAddingBookmark = $state<boolean>(false);
   let isAddingFeed = $state<boolean>(false);
   let feeds = $state<FeedItem[]>([]);
   let feedNextCursor = $state<string | null>(null);
   let feedHasMore = $state<boolean>(true);
+  let pageSize = $state<number>(24);
 
   function handleAuthError(): void {
     // Clear invalid token
@@ -115,7 +111,8 @@
     // Get user info
     user = getUser();
 
-    fetchFeeds();
+    // retrievefeed();
+    fetchFeeds(null, false, true);
 
     // Add click outside listener
     document.addEventListener("click", handleClickOutside);
@@ -131,7 +128,7 @@
   });
 
   async function fetchBookmarks(
-    page: number = 1,
+    cursor: string | null = null,
     append: boolean = false,
   ): Promise<void> {
     if (isLoading) return;
@@ -139,9 +136,12 @@
     isLoading = true;
     const isArchived = activeTab === "archive";
     try {
-      const response = await authenticatedFetch(
-        `${API_BASE_URL}/bookmarks?archived=${isArchived}&page=${page}&page_size=${pageSize}`,
-      );
+      // Build URL with cursor if provided
+      const url = cursor
+        ? `${API_BASE_URL}/bookmarks?archived=${isArchived}&cursor=${cursor}`
+        : `${API_BASE_URL}/bookmarks?archived=${isArchived}`;
+
+      const response = await authenticatedFetch(url);
 
       if (response.status === 401) {
         // JWT authentication failed
@@ -161,10 +161,9 @@
         bookmarks = data.bookmarks;
       }
 
-      currentPage = data.page;
-      totalPages = data.total_pages;
-      totalCount = data.total_count;
-      hasMore = currentPage < totalPages;
+      // Update cursor and hasMore state
+      bookmarkNextCursor = data.next_cursor;
+      hasMore = data.has_more;
     } catch (error) {
       console.error("Failed to fetch bookmarks:", error);
       // You might want to show an error message to the user here
@@ -176,6 +175,7 @@
   async function fetchFeeds(
     cursor: string | null = null,
     append: boolean = false,
+    retrievefeed: boolean = false,
   ): Promise<void> {
     if (isLoading) return;
 
@@ -183,8 +183,8 @@
     try {
       // Build URL with cursor if provided
       const url = cursor
-        ? `${API_BASE_URL}/feeds?cursor=${cursor}&page_size=${pageSize}`
-        : `${API_BASE_URL}/feeds?page_size=${pageSize}`;
+        ? `${API_BASE_URL}/feeds?cursor=${cursor}&page_size=${pageSize}&retrieve_feed=${retrievefeed}`
+        : `${API_BASE_URL}/feeds?page_size=${pageSize}&retrieve_feed=${retrievefeed}`;
 
       const response = await authenticatedFetch(url);
 
@@ -219,14 +219,14 @@
   }
 
   function loadMoreBookmarks(): void {
-    if (hasMore && !isLoading) {
-      fetchBookmarks(currentPage + 1, true);
+    if (hasMore && !isLoading && bookmarkNextCursor) {
+      fetchBookmarks(bookmarkNextCursor, true);
     }
   }
 
   function loadMoreFeeds(): void {
     if (feedHasMore && !isLoading && feedNextCursor) {
-      fetchFeeds(feedNextCursor, true);
+      fetchFeeds(feedNextCursor, true, false);
     }
   }
 
@@ -258,7 +258,6 @@
     }
 
     const newBookmark: BookmarkItem = {
-      user_id: "songpon",
       url: formattedUrl,
     };
 
@@ -332,7 +331,7 @@
       feeds = [];
       feedNextCursor = null;
       feedHasMore = true;
-      fetchFeeds();
+      fetchFeeds(null, false, false);
     } catch (error) {
       console.error("Failed to add feed URL:", error);
       // You might want to show an error message to the user here
@@ -422,10 +421,10 @@
       feeds = [];
       feedNextCursor = null;
       feedHasMore = true;
-      fetchFeeds();
+      fetchFeeds(null, false, false);
     } else {
-      currentPage = 1;
       bookmarks = [];
+      bookmarkNextCursor = null;
       hasMore = true;
       fetchBookmarks();
     }
@@ -666,11 +665,6 @@
               ? "Archived Bookmarks"
               : "Feed"}
         </h2>
-        <span
-          class="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium"
-        >
-          {activeTab === "feed" ? feeds.length : totalCount}
-        </span>
       </div>
 
       {#if activeTab === "feed"}
