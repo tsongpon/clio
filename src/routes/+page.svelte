@@ -52,10 +52,8 @@
 
   interface FeedResponse {
     feeds: FeedItem[];
-    page: number;
-    page_size: number;
-    total_count: number;
-    total_pages: number;
+    next_cursor: string | null;
+    has_more: boolean;
   }
 
   let url = $state<string>("");
@@ -66,16 +64,14 @@
   let currentPage = $state<number>(1);
   let totalPages = $state<number>(1);
   let totalCount = $state<number>(0);
-  let pageSize = $state<number>(12);
+  let pageSize = $state<number>(24);
   let isLoading = $state<boolean>(false);
   let hasMore = $state<boolean>(true);
   let activeTab = $state<"toread" | "archive" | "feed">("feed");
   let isAddingBookmark = $state<boolean>(false);
   let isAddingFeed = $state<boolean>(false);
   let feeds = $state<FeedItem[]>([]);
-  let feedCurrentPage = $state<number>(1);
-  let feedTotalPages = $state<number>(1);
-  let feedTotalCount = $state<number>(0);
+  let feedNextCursor = $state<string | null>(null);
   let feedHasMore = $state<boolean>(true);
 
   function handleAuthError(): void {
@@ -178,16 +174,19 @@
   }
 
   async function fetchFeeds(
-    page: number = 1,
+    cursor: string | null = null,
     append: boolean = false,
   ): Promise<void> {
     if (isLoading) return;
 
     isLoading = true;
     try {
-      const response = await authenticatedFetch(
-        `${API_BASE_URL}/feeds?page=${page}&page_size=${pageSize}`,
-      );
+      // Build URL with cursor if provided
+      const url = cursor
+        ? `${API_BASE_URL}/feeds?cursor=${cursor}&page_size=${pageSize}`
+        : `${API_BASE_URL}/feeds?page_size=${pageSize}`;
+
+      const response = await authenticatedFetch(url);
 
       if (response.status === 401) {
         // JWT authentication failed
@@ -199,41 +198,18 @@
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      const data: FeedResponse = await response.json();
 
-      // Check if response has pagination structure or is just an array
-      if (Array.isArray(data)) {
-        // Response is a simple array
-        if (append) {
-          feeds = [...feeds, ...data];
-        } else {
-          feeds = data;
-        }
-        feedCurrentPage = page;
-        feedTotalCount = data.length;
-        feedTotalPages = 1;
-        feedHasMore = false;
+      // Update feeds array
+      if (append) {
+        feeds = [...feeds, ...data.feeds];
       } else {
-        // Response has pagination structure
-        if (append) {
-          feeds = [...feeds, ...data.feeds];
-        } else {
-          feeds = data.feeds;
-        }
-        feedCurrentPage = data.page || page;
-        feedTotalCount = data.total_count || 0;
-
-        // Calculate total_pages if not provided
-        const pageSize = data.page_size || 24;
-        feedTotalPages =
-          data.total_pages || Math.ceil(feedTotalCount / pageSize);
-
-        // Check if there are more items to load
-        feedHasMore =
-          data.feeds &&
-          data.feeds.length >= pageSize &&
-          feedCurrentPage < feedTotalPages;
+        feeds = data.feeds;
       }
+
+      // Update cursor and hasMore state
+      feedNextCursor = data.next_cursor;
+      feedHasMore = data.has_more;
     } catch (error) {
       console.error("Failed to fetch feeds:", error);
       // You might want to show an error message to the user here
@@ -249,8 +225,8 @@
   }
 
   function loadMoreFeeds(): void {
-    if (feedHasMore && !isLoading) {
-      fetchFeeds(feedCurrentPage + 1, true);
+    if (feedHasMore && !isLoading && feedNextCursor) {
+      fetchFeeds(feedNextCursor, true);
     }
   }
 
@@ -353,8 +329,8 @@
 
       feedUrl = "";
       // Refresh feeds after adding new feed URL
-      feedCurrentPage = 1;
       feeds = [];
+      feedNextCursor = null;
       feedHasMore = true;
       fetchFeeds();
     } catch (error) {
@@ -443,8 +419,8 @@
   function switchTab(tab: "toread" | "archive" | "feed"): void {
     activeTab = tab;
     if (tab === "feed") {
-      feedCurrentPage = 1;
       feeds = [];
+      feedNextCursor = null;
       feedHasMore = true;
       fetchFeeds();
     } else {
@@ -693,7 +669,7 @@
         <span
           class="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium"
         >
-          {activeTab === "feed" ? feedTotalCount : totalCount}
+          {activeTab === "feed" ? feeds.length : totalCount}
         </span>
       </div>
 
