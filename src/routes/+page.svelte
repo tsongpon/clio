@@ -10,6 +10,7 @@
     LogOut,
     Eye,
     Trash2,
+    RefreshCw,
   } from "lucide-svelte";
   import {
     authenticatedFetch,
@@ -35,24 +36,41 @@
 
   interface PaginatedResponse {
     bookmarks: BookmarkItem[];
-    page: number;
-    page_size: number;
-    total_count: number;
-    total_pages: number;
+    next_cursor: string | null;
+    has_more: boolean;
+  }
+
+  interface FeedItem {
+    title: string;
+    main_image_url: string;
+    link: string;
+    description: string;
+    guid: string;
+    published_at: string;
+  }
+
+  interface FeedResponse {
+    feeds: FeedItem[];
+    next_cursor: string | null;
+    has_more: boolean;
   }
 
   let url = $state<string>("");
+  let feedUrl = $state<string>("");
   let bookmarks = $state<BookmarkItem[]>([]);
   let showDropdown = $state<boolean>(false);
   let user = $state<any>(null);
-  let currentPage = $state<number>(1);
-  let totalPages = $state<number>(1);
-  let totalCount = $state<number>(0);
-  let pageSize = $state<number>(12);
-  let isLoading = $state<boolean>(false);
+  let bookmarkNextCursor = $state<string | null>(null);
   let hasMore = $state<boolean>(true);
-  let activeTab = $state<"toread" | "archive">("toread");
+  let isLoading = $state<boolean>(false);
+  let activeTab = $state<"toread" | "archive" | "feed">("feed");
   let isAddingBookmark = $state<boolean>(false);
+  let isAddingFeed = $state<boolean>(false);
+  let feeds = $state<FeedItem[]>([]);
+  let feedNextCursor = $state<string | null>(null);
+  let feedHasMore = $state<boolean>(true);
+  let pageSize = $state<number>(24);
+  let isReloadingFeed = $state<boolean>(false);
 
   function handleAuthError(): void {
     // Clear invalid token
@@ -95,7 +113,8 @@
     // Get user info
     user = getUser();
 
-    fetchBookmarks();
+    // retrievefeed();
+    fetchFeeds(null, false, true);
 
     // Add click outside listener
     document.addEventListener("click", handleClickOutside);
@@ -111,7 +130,7 @@
   });
 
   async function fetchBookmarks(
-    page: number = 1,
+    cursor: string | null = null,
     append: boolean = false,
   ): Promise<void> {
     if (isLoading) return;
@@ -119,9 +138,12 @@
     isLoading = true;
     const isArchived = activeTab === "archive";
     try {
-      const response = await authenticatedFetch(
-        `${API_BASE_URL}/bookmarks?archived=${isArchived}&page=${page}&page_size=${pageSize}`,
-      );
+      // Build URL with cursor if provided
+      const url = cursor
+        ? `${API_BASE_URL}/bookmarks?archived=${isArchived}&cursor=${cursor}`
+        : `${API_BASE_URL}/bookmarks?archived=${isArchived}`;
+
+      const response = await authenticatedFetch(url);
 
       if (response.status === 401) {
         // JWT authentication failed
@@ -141,10 +163,9 @@
         bookmarks = data.bookmarks;
       }
 
-      currentPage = data.page;
-      totalPages = data.total_pages;
-      totalCount = data.total_count;
-      hasMore = currentPage < totalPages;
+      // Update cursor and hasMore state
+      bookmarkNextCursor = data.next_cursor;
+      hasMore = data.has_more;
     } catch (error) {
       console.error("Failed to fetch bookmarks:", error);
       // You might want to show an error message to the user here
@@ -153,9 +174,61 @@
     }
   }
 
+  async function fetchFeeds(
+    cursor: string | null = null,
+    append: boolean = false,
+    retrievefeed: boolean = false,
+  ): Promise<void> {
+    if (isLoading) return;
+
+    isLoading = true;
+    try {
+      // Build URL with cursor if provided
+      const url = cursor
+        ? `${API_BASE_URL}/feeds?cursor=${cursor}&page_size=${pageSize}&retrieve_feed=${retrievefeed}`
+        : `${API_BASE_URL}/feeds?page_size=${pageSize}&retrieve_feed=${retrievefeed}`;
+
+      const response = await authenticatedFetch(url);
+
+      if (response.status === 401) {
+        // JWT authentication failed
+        handleAuthError();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: FeedResponse = await response.json();
+
+      // Update feeds array
+      if (append) {
+        feeds = [...feeds, ...data.feeds];
+      } else {
+        feeds = data.feeds;
+      }
+
+      // Update cursor and hasMore state
+      feedNextCursor = data.next_cursor;
+      feedHasMore = data.has_more;
+    } catch (error) {
+      console.error("Failed to fetch feeds:", error);
+      // You might want to show an error message to the user here
+    } finally {
+      isLoading = false;
+    }
+  }
+
   function loadMoreBookmarks(): void {
-    if (hasMore && !isLoading) {
-      fetchBookmarks(currentPage + 1, true);
+    if (hasMore && !isLoading && bookmarkNextCursor) {
+      fetchBookmarks(bookmarkNextCursor, true);
+    }
+  }
+
+  function loadMoreFeeds(): void {
+    if (feedHasMore && !isLoading && feedNextCursor) {
+      fetchFeeds(feedNextCursor, true, false);
     }
   }
 
@@ -166,7 +239,11 @@
 
     // Load more when user scrolls to bottom (with 100px threshold)
     if (scrollableHeight - scrolled < 100) {
-      loadMoreBookmarks();
+      if (activeTab === "feed") {
+        loadMoreFeeds();
+      } else {
+        loadMoreBookmarks();
+      }
     }
   }
 
@@ -183,7 +260,6 @@
     }
 
     const newBookmark: BookmarkItem = {
-      user_id: "songpon",
       url: formattedUrl,
     };
 
@@ -216,6 +292,53 @@
       // You might want to show an error message to the user here
     } finally {
       isAddingBookmark = false;
+    }
+  }
+
+  async function addFeedUrl(): Promise<void> {
+    if (!feedUrl.trim() || isAddingFeed) return;
+
+    // Basic URL validation
+    let formattedUrl: string = feedUrl.trim();
+    if (
+      !formattedUrl.startsWith("http://") &&
+      !formattedUrl.startsWith("https://")
+    ) {
+      formattedUrl = "https://" + formattedUrl;
+    }
+
+    isAddingFeed = true;
+
+    try {
+      const response = await authenticatedFetch(`${API_BASE_URL}/addfeedurl`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ feed_url: formattedUrl }),
+      });
+
+      if (response.status === 401) {
+        // JWT authentication failed
+        handleAuthError();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      feedUrl = "";
+      // Refresh feeds after adding new feed URL
+      feeds = [];
+      feedNextCursor = null;
+      feedHasMore = true;
+      fetchFeeds(null, false, true);
+    } catch (error) {
+      console.error("Failed to add feed URL:", error);
+      // You might want to show an error message to the user here
+    } finally {
+      isAddingFeed = false;
     }
   }
 
@@ -294,12 +417,19 @@
     fetchBookmarks();
   }
 
-  function switchTab(tab: "toread" | "archive"): void {
+  function switchTab(tab: "toread" | "archive" | "feed"): void {
     activeTab = tab;
-    currentPage = 1;
-    bookmarks = [];
-    hasMore = true;
-    fetchBookmarks();
+    if (tab === "feed") {
+      feeds = [];
+      feedNextCursor = null;
+      feedHasMore = true;
+      fetchFeeds(null, false, false);
+    } else {
+      bookmarks = [];
+      bookmarkNextCursor = null;
+      hasMore = true;
+      fetchBookmarks();
+    }
   }
 
   function handleKeyPress(event: KeyboardEvent): void {
@@ -355,6 +485,21 @@
       return urlObject.hostname;
     } catch {
       return url;
+    }
+  }
+
+  async function reloadFeed(): Promise<void> {
+    if (isReloadingFeed) return;
+
+    isReloadingFeed = true;
+    feeds = [];
+    feedNextCursor = null;
+    feedHasMore = true;
+
+    try {
+      await fetchFeeds(null, false, true);
+    } finally {
+      isReloadingFeed = false;
     }
   }
 </script>
@@ -422,40 +567,20 @@
       </p>
     </div>
 
-    <div class="bg-white rounded-lg shadow p-4 mb-4">
-      <div class="flex gap-2">
-        <Input
-          id="bookmark-input"
-          type="text"
-          placeholder="Enter website URL"
-          bind:value={url}
-          onkeypress={handleKeyPress}
-          class="flex-1 h-10 rounded-lg"
-          disabled={isAddingBookmark}
-        />
-        <Button
-          onclick={addBookmark}
-          disabled={isAddingBookmark}
-          class="h-10 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {#if isAddingBookmark}
-            <div class="flex items-center gap-2">
-              <div
-                class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"
-              ></div>
-              <span>Adding...</span>
-            </div>
-          {:else}
-            Add
-          {/if}
-        </Button>
-      </div>
-    </div>
-
     <div class="space-y-2">
       <!-- Tabs -->
       <div class="bg-white rounded-lg shadow p-1 mb-4">
         <div class="flex gap-1">
+          <button
+            onclick={() => switchTab("feed")}
+            class={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
+              activeTab === "feed"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            Feed
+          </button>
           <button
             onclick={() => switchTab("toread")}
             class={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
@@ -479,18 +604,190 @@
         </div>
       </div>
 
+      <!-- Add Feed URL Box - Only show on Feed tab -->
+      {#if activeTab === "feed"}
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+          <div class="flex gap-2">
+            <Input
+              id="feed-url-input"
+              type="text"
+              placeholder="Enter RSS feed URL"
+              bind:value={feedUrl}
+              onkeypress={(e) => {
+                if (e.key === "Enter") {
+                  addFeedUrl();
+                }
+              }}
+              class="flex-1 h-10 rounded-lg"
+              disabled={isAddingFeed}
+            />
+            <Button
+              onclick={addFeedUrl}
+              disabled={isAddingFeed}
+              class="h-10 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {#if isAddingFeed}
+                <div class="flex items-center gap-2">
+                  <div
+                    class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"
+                  ></div>
+                  <span>Adding...</span>
+                </div>
+              {:else}
+                Subscribe
+              {/if}
+            </Button>
+          </div>
+        </div>
+      {/if}
+
+      <!-- Add Bookmark Box - Only show on To Read tab -->
+      {#if activeTab === "toread"}
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+          <div class="flex gap-2">
+            <Input
+              id="bookmark-input"
+              type="text"
+              placeholder="Enter website URL"
+              bind:value={url}
+              onkeypress={handleKeyPress}
+              class="flex-1 h-10 rounded-lg"
+              disabled={isAddingBookmark}
+            />
+            <Button
+              onclick={addBookmark}
+              disabled={isAddingBookmark}
+              class="h-10 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {#if isAddingBookmark}
+                <div class="flex items-center gap-2">
+                  <div
+                    class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"
+                  ></div>
+                  <span>Adding...</span>
+                </div>
+              {:else}
+                Add
+              {/if}
+            </Button>
+          </div>
+        </div>
+      {/if}
+
       <div class="flex items-center justify-between mb-2">
-        <h2 class="text-lg font-semibold text-slate-900">
-          {activeTab === "toread" ? "To Read" : "Archived Bookmarks"}
-        </h2>
-        <span
-          class="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium"
-        >
-          {totalCount}
-        </span>
+        {#if activeTab === "feed"}
+          <Button
+            onclick={reloadFeed}
+            disabled={isReloadingFeed}
+            class="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Reload feed"
+          >
+            <RefreshCw
+              class={`w-4 h-4 mr-2 ${isReloadingFeed ? "animate-spin" : ""}`}
+            />
+            Feed
+          </Button>
+        {:else}
+          <h2 class="text-lg font-semibold text-slate-900">
+            {activeTab === "toread" ? "To Read" : "Archived Bookmarks"}
+          </h2>
+        {/if}
       </div>
 
-      {#if bookmarks.length === 0}
+      {#if activeTab === "feed"}
+        <!-- Feed Tab Content -->
+        {#if feeds.length === 0}
+          <div class="bg-white rounded-lg shadow p-8 text-center">
+            <div
+              class="bg-slate-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+            >
+              <Bookmark class="w-6 h-6 text-slate-400" />
+            </div>
+            <p class="text-slate-600 font-medium text-sm">No feeds yet</p>
+            <p class="text-slate-400 text-xs mt-1">
+              Check back later for updates!
+            </p>
+          </div>
+        {:else}
+          <!-- Feed Card Grid -->
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {#each feeds as feed (feed.guid)}
+              <div
+                class="bg-white rounded-lg shadow hover:shadow-lg transition-all overflow-hidden flex flex-col"
+              >
+                <!-- Main Image on Top -->
+                <div
+                  class="w-full h-48 overflow-hidden cursor-pointer"
+                  onclick={() => openBookmark(feed.link)}
+                  role="button"
+                  tabindex="0"
+                  onkeydown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openBookmark(feed.link);
+                    }
+                  }}
+                >
+                  <img
+                    src={feed.main_image_url || placeholderImage}
+                    alt={feed.title || "Feed image"}
+                    class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                    onerror={(e) => {
+                      e.currentTarget.src = placeholderImage;
+                    }}
+                  />
+                </div>
+
+                <!-- Date Below Image -->
+                <div class="px-4 pt-3 pb-2">
+                  <span class="text-xs text-slate-500">
+                    {formatDate(feed.published_at)}
+                  </span>
+                </div>
+
+                <!-- Card Content -->
+                <div class="px-4 pb-4 flex-1 flex flex-col">
+                  <!-- Title -->
+                  <h3
+                    class="text-lg font-semibold text-slate-900 mb-2 line-clamp-2 cursor-pointer hover:text-blue-600 transition-colors"
+                    onclick={() => openBookmark(feed.link)}
+                    role="button"
+                    tabindex="0"
+                    onkeydown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openBookmark(feed.link);
+                      }
+                    }}
+                  >
+                    {feed.title || "Untitled Feed"}
+                  </h3>
+
+                  <!-- Feed Source -->
+                  <p
+                    class="text-xs text-blue-600 mb-3 truncate flex items-center gap-1"
+                  >
+                    <ExternalLink class="w-3 h-3 flex-shrink-0" />
+                    {extractDomain(feed.link)}
+                  </p>
+
+                  <!-- Description -->
+                  {#if feed.description}
+                    <div
+                      class="text-sm text-slate-600 mb-4 line-clamp-3 flex-1"
+                    >
+                      {@html feed.description.substring(0, 200)}{feed
+                        .description.length > 200
+                        ? "..."
+                        : ""}
+                    </div>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      {:else if bookmarks.length === 0}
         <div class="bg-white rounded-lg shadow p-8 text-center">
           <div
             class="bg-slate-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
@@ -621,14 +918,36 @@
             <div
               class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"
             ></div>
-            <span class="text-sm text-slate-600">Loading more bookmarks...</span
-            >
+            <span class="text-sm text-slate-600">
+              {activeTab === "feed"
+                ? "Loading more feeds..."
+                : "Loading more bookmarks..."}
+            </span>
           </div>
         </div>
       {/if}
 
       <!-- End of List Indicator -->
-      {#if !hasMore && bookmarks.length > 0}
+      {#if activeTab === "feed" && !feedHasMore && feeds.length > 0}
+        <div class="bg-white rounded-lg shadow p-4 mt-4">
+          <div class="flex flex-col items-center gap-3">
+            <p class="text-center text-sm text-slate-500">
+              You've reached the end of your feeds
+            </p>
+            <Button
+              onclick={reloadFeed}
+              disabled={isReloadingFeed}
+              class="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Reload feed"
+            >
+              <RefreshCw
+                class={`w-4 h-4 mr-2 ${isReloadingFeed ? "animate-spin" : ""}`}
+              />
+              {isReloadingFeed ? "Reloading..." : "Reload Feed"}
+            </Button>
+          </div>
+        </div>
+      {:else if activeTab !== "feed" && !hasMore && bookmarks.length > 0}
         <div class="bg-white rounded-lg shadow p-4 mt-4">
           <p class="text-center text-sm text-slate-500">
             You've reached the end of your bookmarks
