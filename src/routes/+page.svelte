@@ -10,6 +10,7 @@
     LogOut,
     Eye,
     Trash2,
+    RefreshCw,
   } from "lucide-svelte";
   import {
     authenticatedFetch,
@@ -69,6 +70,7 @@
   let feedNextCursor = $state<string | null>(null);
   let feedHasMore = $state<boolean>(true);
   let pageSize = $state<number>(24);
+  let isReloadingFeed = $state<boolean>(false);
 
   function handleAuthError(): void {
     // Clear invalid token
@@ -331,7 +333,7 @@
       feeds = [];
       feedNextCursor = null;
       feedHasMore = true;
-      fetchFeeds(null, false, false);
+      fetchFeeds(null, false, true);
     } catch (error) {
       console.error("Failed to add feed URL:", error);
       // You might want to show an error message to the user here
@@ -483,6 +485,21 @@
       return urlObject.hostname;
     } catch {
       return url;
+    }
+  }
+
+  async function reloadFeed(): Promise<void> {
+    if (isReloadingFeed) return;
+
+    isReloadingFeed = true;
+    feeds = [];
+    feedNextCursor = null;
+    feedHasMore = true;
+
+    try {
+      await fetchFeeds(null, false, true);
+    } finally {
+      isReloadingFeed = false;
     }
   }
 </script>
@@ -658,13 +675,23 @@
       {/if}
 
       <div class="flex items-center justify-between mb-2">
-        <h2 class="text-lg font-semibold text-slate-900">
-          {activeTab === "toread"
-            ? "To Read"
-            : activeTab === "archive"
-              ? "Archived Bookmarks"
-              : "Feed"}
-        </h2>
+        {#if activeTab === "feed"}
+          <Button
+            onclick={reloadFeed}
+            disabled={isReloadingFeed}
+            class="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            aria-label="Reload feed"
+          >
+            <RefreshCw
+              class={`w-4 h-4 mr-2 ${isReloadingFeed ? "animate-spin" : ""}`}
+            />
+            Feed
+          </Button>
+        {:else}
+          <h2 class="text-lg font-semibold text-slate-900">
+            {activeTab === "toread" ? "To Read" : "Archived Bookmarks"}
+          </h2>
+        {/if}
       </div>
 
       {#if activeTab === "feed"}
@@ -903,9 +930,22 @@
       <!-- End of List Indicator -->
       {#if activeTab === "feed" && !feedHasMore && feeds.length > 0}
         <div class="bg-white rounded-lg shadow p-4 mt-4">
-          <p class="text-center text-sm text-slate-500">
-            You've reached the end of your feeds
-          </p>
+          <div class="flex flex-col items-center gap-3">
+            <p class="text-center text-sm text-slate-500">
+              You've reached the end of your feeds
+            </p>
+            <Button
+              onclick={reloadFeed}
+              disabled={isReloadingFeed}
+              class="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Reload feed"
+            >
+              <RefreshCw
+                class={`w-4 h-4 mr-2 ${isReloadingFeed ? "animate-spin" : ""}`}
+              />
+              {isReloadingFeed ? "Reloading..." : "Reload Feed"}
+            </Button>
+          </div>
         </div>
       {:else if activeTab !== "feed" && !hasMore && bookmarks.length > 0}
         <div class="bg-white rounded-lg shadow p-4 mt-4">
