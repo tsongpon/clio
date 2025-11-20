@@ -11,6 +11,8 @@
     Eye,
     Trash2,
     RefreshCw,
+    Check,
+    X,
   } from "lucide-svelte";
   import {
     authenticatedFetch,
@@ -71,6 +73,8 @@
   let feedHasMore = $state<boolean>(true);
   let pageSize = $state<number>(24);
   let isReloadingFeed = $state<boolean>(false);
+  let bookmarkNotification = $state<string | null>(null);
+  let notificationTimeout: number | null = null;
 
   function handleAuthError(): void {
     // Clear invalid token
@@ -360,9 +364,12 @@
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
+
+      // Show success notification
+      showNotification("Bookmark archived successfully!");
     } catch (error) {
       console.error("Failed to archive bookmark:", error);
-      // You might want to show an error message to the user here
+      showNotification("Failed to archive bookmark");
     }
     fetchBookmarks();
   }
@@ -502,11 +509,93 @@
       isReloadingFeed = false;
     }
   }
+
+  async function removeFeed(feedGuid: string): Promise<void> {
+    try {
+      // Mock API endpoint - replace with actual endpoint when ready
+      const response = await authenticatedFetch(
+        `${API_BASE_URL}/feeds/${feedGuid}/remove`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (response.status === 401) {
+        handleAuthError();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Remove the feed from the local array
+      feeds = feeds.filter((f) => f.guid !== feedGuid);
+    } catch (error) {
+      console.error("Failed to remove feed:", error);
+      // For now, still remove it locally even if API fails (mock behavior)
+      feeds = feeds.filter((f) => f.guid !== feedGuid);
+    }
+  }
+
+  async function bookmarkFeed(feed: FeedItem): Promise<void> {
+    try {
+      const response = await authenticatedFetch(`${API_BASE_URL}/bookmarks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url: feed.link,
+        }),
+      });
+
+      if (response.status === 401) {
+        handleAuthError();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Show success notification
+      showNotification("Feed saved to bookmarks!");
+    } catch (error) {
+      console.error("Failed to bookmark feed:", error);
+      showNotification("Failed to save bookmark");
+    }
+  }
+
+  function showNotification(message: string): void {
+    // Clear existing timeout if any
+    if (notificationTimeout) {
+      clearTimeout(notificationTimeout);
+    }
+
+    bookmarkNotification = message;
+
+    // Auto-hide after 3 seconds
+    notificationTimeout = setTimeout(() => {
+      bookmarkNotification = null;
+      notificationTimeout = null;
+    }, 3000);
+  }
 </script>
 
 <div
   class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-3 md:p-4"
 >
+  <!-- Notification Toast -->
+  {#if bookmarkNotification}
+    <div
+      class="fixed top-4 right-4 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-slide-in"
+    >
+      <Bookmark class="w-5 h-5" />
+      <span class="font-medium">{bookmarkNotification}</span>
+    </div>
+  {/if}
+
   <div class="mx-auto max-w-7xl">
     <div class="mb-4 bg-white rounded-lg shadow p-4">
       <div class="flex items-center justify-between mb-1">
@@ -782,6 +871,25 @@
                         : ""}
                     </div>
                   {/if}
+
+                  <!-- Action Buttons -->
+                  <div
+                    class="flex items-center gap-2 mt-auto pt-3 border-t border-slate-100"
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onclick={(e) => {
+                        e.stopPropagation();
+                        bookmarkFeed(feed);
+                      }}
+                      class="w-full h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all"
+                      aria-label="Bookmark this feed"
+                    >
+                      <Bookmark class="w-4 h-4 mr-1" />
+                      Bookmark
+                    </Button>
+                  </div>
                 </div>
               </div>
             {/each}
@@ -957,3 +1065,20 @@
     </div>
   </div>
 </div>
+
+<style>
+  @keyframes slide-in {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  :global(.animate-slide-in) {
+    animation: slide-in 0.3s ease-out;
+  }
+</style>
