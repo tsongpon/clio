@@ -13,6 +13,7 @@
     RefreshCw,
     Check,
     X,
+    Settings,
   } from "lucide-svelte";
   import {
     authenticatedFetch,
@@ -94,6 +95,10 @@
 
   function closeDropdown(): void {
     showDropdown = false;
+  }
+
+  function goToSubscriptions(): void {
+    goto("/subscriptions");
   }
 
   function openBookmark(url: string): void {
@@ -639,6 +644,14 @@
                   </p>
                 </div>
               {/if}
+
+              <button
+                onclick={goToSubscriptions}
+                class="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <Settings class="w-4 h-4" />
+                <span>Manage Subscriptions</span>
+              </button>
 
               <button
                 onclick={handleLogout}
