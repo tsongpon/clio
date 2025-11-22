@@ -4,18 +4,21 @@
 
 export interface RSSSubscription {
   id: string;
-  feed_url: string;
   title: string;
+  url: string;
+  feed_url: string;
+  image?: string;
   description?: string;
-  site_url?: string;
-  user_id: string;
+  latest_update?: string;
   created_at: string;
-  last_fetched_at?: string;
-  is_active: boolean;
+  // Legacy fields that might be deprecated
+  user_id?: string;
+  is_active?: boolean;
   fetch_frequency_minutes?: number;
 }
 
 export interface SubscriptionResponse {
-  subscriptions: RSSSubscription[];
-  total: number;
+  data: RSSSubscription[];
+  next_cursor: string | null;
+  has_more: boolean;
 }

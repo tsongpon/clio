@@ -24,7 +24,7 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { API_BASE_URL } from "$lib/config";
-  import placeholderImage from "$lib/assets/placeholder.svg";
+  import placeholderImage from "$lib/assets/feed-placeholder.svg";
 
   interface BookmarkItem {
     id: string;
@@ -53,13 +53,12 @@
   }
 
   interface FeedResponse {
-    feeds: FeedItem[];
+    data: FeedItem[];
     next_cursor: string | null;
     has_more: boolean;
   }
 
   let url = $state<string>("");
-  let feedUrl = $state<string>("");
   let bookmarks = $state<BookmarkItem[]>([]);
   let showDropdown = $state<boolean>(false);
   let user = $state<any>(null);
@@ -68,7 +67,6 @@
   let isLoading = $state<boolean>(false);
   let activeTab = $state<"toread" | "archive" | "feed">("feed");
   let isAddingBookmark = $state<boolean>(false);
-  let isAddingFeed = $state<boolean>(false);
   let feeds = $state<FeedItem[]>([]);
   let feedNextCursor = $state<string | null>(null);
   let feedHasMore = $state<boolean>(true);
@@ -213,9 +211,9 @@
 
       // Update feeds array
       if (append) {
-        feeds = [...feeds, ...data.feeds];
+        feeds = [...feeds, ...data.data];
       } else {
-        feeds = data.feeds;
+        feeds = data.data;
       }
 
       // Update cursor and hasMore state
@@ -304,52 +302,6 @@
     }
   }
 
-  async function addFeedUrl(): Promise<void> {
-    if (!feedUrl.trim() || isAddingFeed) return;
-
-    // Basic URL validation
-    let formattedUrl: string = feedUrl.trim();
-    if (
-      !formattedUrl.startsWith("http://") &&
-      !formattedUrl.startsWith("https://")
-    ) {
-      formattedUrl = "https://" + formattedUrl;
-    }
-
-    isAddingFeed = true;
-
-    try {
-      const response = await authenticatedFetch(`${API_BASE_URL}/addfeedurl`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ feed_url: formattedUrl }),
-      });
-
-      if (response.status === 401) {
-        // JWT authentication failed
-        handleAuthError();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      feedUrl = "";
-      // Refresh feeds after adding new feed URL
-      feeds = [];
-      feedNextCursor = null;
-      feedHasMore = true;
-      fetchFeeds(null, false, true);
-    } catch (error) {
-      console.error("Failed to add feed URL:", error);
-      // You might want to show an error message to the user here
-    } finally {
-      isAddingFeed = false;
-    }
-  }
 
   async function archiveBookmark(id: string): Promise<void> {
     try {
@@ -671,8 +623,8 @@
 
     <div class="space-y-2">
       <!-- Tabs -->
-      <div class="bg-white rounded-lg shadow p-1 mb-4">
-        <div class="flex gap-1">
+      <div class="bg-white rounded-lg shadow p-1 mb-4 flex justify-between items-center">
+        <div class="flex gap-1 flex-1">
           <button
             onclick={() => switchTab("feed")}
             class={`flex-1 px-4 py-2 rounded-lg font-medium text-sm transition-all ${
@@ -704,44 +656,25 @@
             Archive
           </button>
         </div>
+        {#if activeTab === "feed"}
+          <div class="px-1">
+            <Button
+              onclick={reloadFeed}
+              disabled={isReloadingFeed}
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg"
+              aria-label="Reload feed"
+            >
+              <RefreshCw
+                class={`w-4 h-4 ${isReloadingFeed ? "animate-spin" : ""}`}
+              />
+            </Button>
+          </div>
+        {/if}
       </div>
 
       <!-- Add Feed URL Box - Only show on Feed tab -->
-      {#if activeTab === "feed"}
-        <div class="bg-white rounded-lg shadow p-4 mb-4">
-          <div class="flex gap-2">
-            <Input
-              id="feed-url-input"
-              type="text"
-              placeholder="Enter RSS feed URL"
-              bind:value={feedUrl}
-              onkeypress={(e) => {
-                if (e.key === "Enter") {
-                  addFeedUrl();
-                }
-              }}
-              class="flex-1 h-10 rounded-lg"
-              disabled={isAddingFeed}
-            />
-            <Button
-              onclick={addFeedUrl}
-              disabled={isAddingFeed}
-              class="h-10 px-4 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {#if isAddingFeed}
-                <div class="flex items-center gap-2">
-                  <div
-                    class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"
-                  ></div>
-                  <span>Adding...</span>
-                </div>
-              {:else}
-                Subscribe
-              {/if}
-            </Button>
-          </div>
-        </div>
-      {/if}
 
       <!-- Add Bookmark Box - Only show on To Read tab -->
       {#if activeTab === "toread"}
@@ -776,25 +709,6 @@
         </div>
       {/if}
 
-      <div class="flex items-center justify-between mb-2">
-        {#if activeTab === "feed"}
-          <Button
-            onclick={reloadFeed}
-            disabled={isReloadingFeed}
-            class="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Reload feed"
-          >
-            <RefreshCw
-              class={`w-4 h-4 mr-2 ${isReloadingFeed ? "animate-spin" : ""}`}
-            />
-            Feed
-          </Button>
-        {:else}
-          <h2 class="text-lg font-semibold text-slate-900">
-            {activeTab === "toread" ? "To Read" : "Archived Bookmarks"}
-          </h2>
-        {/if}
-      </div>
 
       {#if activeTab === "feed"}
         <!-- Feed Tab Content -->

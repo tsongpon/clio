@@ -25,6 +25,8 @@
   import type { RSSSubscription } from "$lib/types/subscription";
 
   let subscriptions = $state<RSSSubscription[]>([]);
+  let nextCursor = $state<string | null>(null);
+  let hasMore = $state<boolean>(false);
   let showDropdown = $state<boolean>(false);
   let user = $state<any>(null);
   let isLoading = $state<boolean>(false);
@@ -92,11 +94,14 @@
       }
 
       if (!response.ok) {
+        showNotification(`Failed to fetch subscriptions: ${response.status}`, "error");
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      subscriptions = data.subscriptions || [];
+      subscriptions = data.data || [];
+      nextCursor = data.next_cursor;
+      hasMore = data.has_more;
     } catch (error) {
       console.error("Failed to fetch subscriptions:", error);
       // Mock data for development
@@ -113,10 +118,10 @@
         feed_url: "https://example.com/feed.xml",
         title: "Tech News Daily",
         description: "Latest technology news and updates",
-        site_url: "https://example.com",
+        url: "https://example.com",
         user_id: "user123",
         created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        last_fetched_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        latest_update: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
         is_active: true,
         fetch_frequency_minutes: 60,
       },
@@ -125,10 +130,10 @@
         feed_url: "https://blog.example.com/rss",
         title: "Developer Blog",
         description: "Programming tutorials and best practices",
-        site_url: "https://blog.example.com",
+        url: "https://blog.example.com",
         user_id: "user123",
         created_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-        last_fetched_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+        latest_update: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
         is_active: true,
         fetch_frequency_minutes: 30,
       },
@@ -137,10 +142,10 @@
         feed_url: "https://news.example.org/feed",
         title: "World News",
         description: "Global news coverage",
-        site_url: "https://news.example.org",
+        url: "https://news.example.org",
         user_id: "user123",
         created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        last_fetched_at: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+        latest_update: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
         is_active: true,
         fetch_frequency_minutes: 120,
       },
@@ -175,6 +180,7 @@
       }
 
       if (!response.ok) {
+        showNotification(`Failed to add subscription: ${response.status}`, "error");
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -183,21 +189,7 @@
       await fetchSubscriptions();
     } catch (error) {
       console.error("Failed to add subscription:", error);
-      // Mock behavior - add locally
-      const newSub: RSSSubscription = {
-        id: Date.now().toString(),
-        feed_url: formattedUrl,
-        title: extractDomainName(formattedUrl),
-        description: "New RSS feed subscription",
-        site_url: formattedUrl,
-        user_id: user?.id || "user123",
-        created_at: new Date().toISOString(),
-        is_active: true,
-        fetch_frequency_minutes: 60,
-      };
-      subscriptions = [newSub, ...subscriptions];
-      newFeedUrl = "";
-      showNotification("Subscription added (mock)", "success");
+      showNotification("Failed to add subscription", "error");
     } finally {
       isAddingFeed = false;
     }
@@ -218,6 +210,7 @@
       }
 
       if (!response.ok) {
+        showNotification(`Failed to remove subscription: ${response.status}`, "error");
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -227,39 +220,9 @@
       console.error("Failed to remove subscription:", error);
       // Mock behavior - remove locally
       subscriptions = subscriptions.filter((s) => s.id !== id);
-      showNotification("Subscription removed (mock)", "success");
     }
   }
 
-  async function refreshSubscription(id: string): Promise<void> {
-    try {
-      const response = await authenticatedFetch(
-        `${API_BASE_URL}/subscriptions/${id}/refresh`,
-        {
-          method: "POST",
-        }
-      );
-
-      if (response.status === 401) {
-        handleAuthError();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      showNotification("Feed refreshed successfully!", "success");
-      await fetchSubscriptions();
-    } catch (error) {
-      console.error("Failed to refresh subscription:", error);
-      // Mock behavior - update last_fetched_at
-      subscriptions = subscriptions.map((s) =>
-        s.id === id ? { ...s, last_fetched_at: new Date().toISOString() } : s
-      );
-      showNotification("Feed refreshed (mock)", "success");
-    }
-  }
 
   function showNotification(
     message: string,
@@ -485,12 +448,12 @@
                 </div>
                 <div
                   class={`ml-2 px-2 py-1 rounded text-xs font-medium flex-shrink-0 ${
-                    subscription.is_active
+                    subscription.is_active !== false
                       ? "bg-green-100 text-green-700"
                       : "bg-slate-100 text-slate-700"
                   }`}
                 >
-                  {subscription.is_active ? "Active" : "Inactive"}
+                  {subscription.is_active !== false ? "Active" : "Inactive"}
                 </div>
               </div>
 
@@ -511,10 +474,10 @@
                   <span class="font-medium">Added:</span>
                   <span>{formatDate(subscription.created_at)}</span>
                 </div>
-                {#if subscription.last_fetched_at}
+                {#if subscription.latest_update}
                   <div class="flex items-center gap-2">
                     <span class="font-medium">Last fetched:</span>
-                    <span>{formatDate(subscription.last_fetched_at)}</span>
+                    <span>{formatDate(subscription.latest_update)}</span>
                   </div>
                 {/if}
                 {#if subscription.fetch_frequency_minutes}
@@ -527,19 +490,6 @@
 
               <!-- Actions -->
               <div class="flex items-center gap-2 pt-3 border-t border-slate-100">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onclick={(e) => {
-                    e.stopPropagation();
-                    refreshSubscription(subscription.id);
-                  }}
-                  class="flex-1 h-9 text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all"
-                  aria-label="Refresh feed"
-                >
-                  <RefreshCw class="w-4 h-4 mr-1" />
-                  Refresh
-                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
