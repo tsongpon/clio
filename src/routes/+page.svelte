@@ -31,7 +31,7 @@
   let feeds = $state<FeedItem[]>([]);
   let feedNextCursor = $state<string | null>(null);
   let feedHasMore = $state<boolean>(true);
-  let pageSize = $state<number>(24);
+  let pageSize = $state<number>(30);
   let isLoading = $state<boolean>(false);
   let isReloadingFeed = $state<boolean>(false);
 
@@ -242,7 +242,7 @@
             >
               <!-- Main Image on Top -->
               <div
-                class="w-full h-48 overflow-hidden cursor-pointer"
+                class="w-full h-52 overflow-hidden cursor-pointer"
                 onclick={() => openFeedLink(feed.link)}
                 role="button"
                 tabindex="0"
@@ -299,9 +299,9 @@
 
                 <!-- Description -->
                 {#if feed.description}
-                  <div class="text-sm text-slate-600 mb-4 line-clamp-3 flex-1">
-                    {@html feed.description.substring(0, 200)}{feed.description
-                      .length > 200
+                  <div class="text-sm text-slate-600 mb-4 line-clamp-4 flex-1">
+                    {@html feed.description.substring(0, 300)}{feed.description
+                      .length > 300
                       ? "..."
                       : ""}
                   </div>

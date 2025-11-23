@@ -2,7 +2,13 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Card } from "$lib/components/ui/card";
-  import { Rss, Trash2, ExternalLink, Plus, AlertCircle } from "lucide-svelte";
+  import {
+    Rss,
+    UserMinus,
+    ExternalLink,
+    Plus,
+    AlertCircle,
+  } from "lucide-svelte";
   import {
     authenticatedFetch,
     isAuthenticated,
@@ -174,9 +180,13 @@
   async function removeSubscription(id: string): Promise<void> {
     try {
       const response = await authenticatedFetch(
-        `${API_BASE_URL}/subscriptions/${id}`,
+        `${API_BASE_URL}/subscriptions`,
         {
           method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ subscription_id: id }),
         },
       );
 
@@ -364,15 +374,7 @@
                     </p>
                   {/if}
                 </div>
-                <div
-                  class={`ml-2 px-2 py-1 rounded text-xs font-medium flex-shrink-0 ${
-                    subscription.is_active !== false
-                      ? "bg-green-100 text-green-700"
-                      : "bg-slate-100 text-slate-700"
-                  }`}
-                >
-                  {subscription.is_active !== false ? "Active" : "Inactive"}
-                </div>
+
               </div>
 
               <!-- Feed URL -->
@@ -420,10 +422,10 @@
                     removeSubscription(subscription.id);
                   }}
                   class="flex-1 h-9 text-red-600 hover:text-red-700 hover:bg-red-50 transition-all"
-                  aria-label="Delete subscription"
+                  aria-label="Unsubscribe"
                 >
-                  <Trash2 class="w-4 h-4 mr-1" />
-                  Remove
+                  <UserMinus class="w-4 h-4 mr-1" />
+                  Unsubscribe
                 </Button>
               </div>
             </div>
