@@ -2,22 +2,11 @@
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
   import { Card } from "$lib/components/ui/card";
-  import {
-    Rss,
-    User,
-    LogOut,
-    Trash2,
-    ExternalLink,
-    Plus,
-    RefreshCw,
-    Home,
-    AlertCircle,
-  } from "lucide-svelte";
+  import { Rss, Trash2, ExternalLink, Plus, AlertCircle } from "lucide-svelte";
   import {
     authenticatedFetch,
     isAuthenticated,
     removeToken,
-    getUser,
   } from "$lib/utils/auth";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
@@ -27,39 +16,18 @@
   let subscriptions = $state<RSSSubscription[]>([]);
   let nextCursor = $state<string | null>(null);
   let hasMore = $state<boolean>(false);
-  let showDropdown = $state<boolean>(false);
-  let user = $state<any>(null);
   let isLoading = $state<boolean>(false);
   let newFeedUrl = $state<string>("");
   let isAddingFeed = $state<boolean>(false);
-  let notification = $state<{ message: string; type: "success" | "error" } | null>(
-    null
-  );
+  let notification = $state<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
   let notificationTimeout: number | null = null;
 
   function handleAuthError(): void {
     removeToken();
     goto("/login");
-  }
-
-  function handleLogout(): void {
-    removeToken();
-    goto("/login");
-  }
-
-  function toggleDropdown(): void {
-    showDropdown = !showDropdown;
-  }
-
-  function closeDropdown(): void {
-    showDropdown = false;
-  }
-
-  function handleClickOutside(event: MouseEvent): void {
-    const target = event.target as HTMLElement;
-    if (!target.closest(".user-dropdown")) {
-      closeDropdown();
-    }
   }
 
   onMount(() => {
@@ -68,14 +36,7 @@
       return;
     }
 
-    user = getUser();
     fetchSubscriptions();
-
-    document.addEventListener("click", handleClickOutside);
-
-    return () => {
-      document.removeEventListener("click", handleClickOutside);
-    };
   });
 
   async function fetchSubscriptions(): Promise<void> {
@@ -85,7 +46,7 @@
     try {
       // Mock API endpoint - will be replaced with actual backend
       const response = await authenticatedFetch(
-        `${API_BASE_URL}/subscriptions`
+        `${API_BASE_URL}/subscriptions`,
       );
 
       if (response.status === 401) {
@@ -94,7 +55,10 @@
       }
 
       if (!response.ok) {
-        showNotification(`Failed to fetch subscriptions: ${response.status}`, "error");
+        showNotification(
+          `Failed to fetch subscriptions: ${response.status}`,
+          "error",
+        );
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -120,7 +84,9 @@
         description: "Latest technology news and updates",
         url: "https://example.com",
         user_id: "user123",
-        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        created_at: new Date(
+          Date.now() - 7 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
         latest_update: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
         is_active: true,
         fetch_frequency_minutes: 60,
@@ -132,7 +98,9 @@
         description: "Programming tutorials and best practices",
         url: "https://blog.example.com",
         user_id: "user123",
-        created_at: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+        created_at: new Date(
+          Date.now() - 14 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
         latest_update: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
         is_active: true,
         fetch_frequency_minutes: 30,
@@ -144,7 +112,9 @@
         description: "Global news coverage",
         url: "https://news.example.org",
         user_id: "user123",
-        created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        created_at: new Date(
+          Date.now() - 30 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
         latest_update: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
         is_active: true,
         fetch_frequency_minutes: 120,
@@ -166,13 +136,16 @@
     isAddingFeed = true;
 
     try {
-      const response = await authenticatedFetch(`${API_BASE_URL}/subscriptions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await authenticatedFetch(
+        `${API_BASE_URL}/subscriptions`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ feed_url: formattedUrl }),
         },
-        body: JSON.stringify({ feed_url: formattedUrl }),
-      });
+      );
 
       if (response.status === 401) {
         handleAuthError();
@@ -180,7 +153,10 @@
       }
 
       if (!response.ok) {
-        showNotification(`Failed to add subscription: ${response.status}`, "error");
+        showNotification(
+          `Failed to add subscription: ${response.status}`,
+          "error",
+        );
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -201,7 +177,7 @@
         `${API_BASE_URL}/subscriptions/${id}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -210,7 +186,10 @@
       }
 
       if (!response.ok) {
-        showNotification(`Failed to remove subscription: ${response.status}`, "error");
+        showNotification(
+          `Failed to remove subscription: ${response.status}`,
+          "error",
+        );
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
@@ -223,10 +202,9 @@
     }
   }
 
-
   function showNotification(
     message: string,
-    type: "success" | "error" = "success"
+    type: "success" | "error" = "success",
   ): void {
     if (notificationTimeout) {
       clearTimeout(notificationTimeout);
@@ -263,15 +241,9 @@
   function openUrl(url: string): void {
     window.open(url, "_blank", "noopener,noreferrer");
   }
-
-  function goHome(): void {
-    goto("/");
-  }
 </script>
 
-<div
-  class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-3 md:p-4"
->
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
   <!-- Notification Toast -->
   {#if notification}
     <div
@@ -291,73 +263,19 @@
   {/if}
 
   <div class="mx-auto max-w-7xl">
-    <!-- Header -->
-    <div class="mb-4 bg-white rounded-lg shadow p-4">
-      <div class="flex items-center justify-between mb-1">
-        <div class="flex items-center gap-2">
-          <Button
-            onclick={goHome}
-            variant="ghost"
-            size="sm"
-            class="p-2 hover:bg-slate-100 rounded-lg"
-            aria-label="Go to home"
-          >
-            <Home class="w-5 h-5 text-slate-600" />
-          </Button>
-          <div class="bg-orange-600 p-2 rounded-lg">
-            <Rss class="w-5 h-5 text-white" />
+    <!-- Page Header -->
+    <div class="mb-6">
+      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div class="flex items-center gap-4">
+          <div class="text-4xl">📡</div>
+          <div>
+            <h1 class="text-3xl font-bold text-gray-900">RSS Subscriptions</h1>
+            <p class="text-sm text-gray-600 mt-1">
+              Manage your RSS feed subscriptions and stay updated
+            </p>
           </div>
-          <h1
-            class="text-balance text-2xl font-bold tracking-tight text-slate-900"
-          >
-            RSS Subscriptions
-          </h1>
-        </div>
-
-        <!-- User Profile Dropdown -->
-        <div class="relative user-dropdown">
-          <button
-            onclick={toggleDropdown}
-            class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
-            aria-label="User menu"
-          >
-            <div class="bg-blue-600 p-2 rounded-full">
-              <User class="w-4 h-4 text-white" />
-            </div>
-            {#if user?.name}
-              <span class="text-sm font-medium text-slate-700 hidden sm:block">
-                {user.name}
-              </span>
-            {/if}
-          </button>
-
-          {#if showDropdown}
-            <div
-              class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-10"
-            >
-              {#if user?.email}
-                <div class="px-4 py-2 border-b border-slate-200">
-                  <p class="text-xs text-slate-500">Signed in as</p>
-                  <p class="text-sm font-medium text-slate-900 truncate">
-                    {user.email}
-                  </p>
-                </div>
-              {/if}
-
-              <button
-                onclick={handleLogout}
-                class="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-100 transition-colors"
-              >
-                <LogOut class="w-4 h-4" />
-                <span>Logout</span>
-              </button>
-            </div>
-          {/if}
         </div>
       </div>
-      <p class="text-slate-600 text-sm ml-[44px]">
-        Manage your RSS feed subscriptions
-      </p>
     </div>
 
     <!-- Add Subscription Form -->
@@ -483,13 +401,17 @@
                 {#if subscription.fetch_frequency_minutes}
                   <div class="flex items-center gap-2">
                     <span class="font-medium">Update frequency:</span>
-                    <span>Every {subscription.fetch_frequency_minutes} minutes</span>
+                    <span
+                      >Every {subscription.fetch_frequency_minutes} minutes</span
+                    >
                   </div>
                 {/if}
               </div>
 
               <!-- Actions -->
-              <div class="flex items-center gap-2 pt-3 border-t border-slate-100">
+              <div
+                class="flex items-center gap-2 pt-3 border-t border-slate-100"
+              >
                 <Button
                   variant="ghost"
                   size="sm"
