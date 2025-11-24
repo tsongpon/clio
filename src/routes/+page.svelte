@@ -2,7 +2,12 @@
   import { page } from "$app/stores";
   import { Button } from "$lib/components/ui/button";
   import { Card } from "$lib/components/ui/card";
-  import { ExternalLink, RefreshCw } from "lucide-svelte";
+  import {
+    ExternalLink,
+    RefreshCw,
+    Bookmark,
+    AlertCircle,
+  } from "lucide-svelte";
   import {
     authenticatedFetch,
     isAuthenticated,
@@ -34,6 +39,11 @@
   let pageSize = $state<number>(30);
   let isLoading = $state<boolean>(false);
   let isReloadingFeed = $state<boolean>(false);
+  let notification = $state<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+  let notificationTimeout: number | null = null;
 
   function handleAuthError(): void {
     // Clear invalid token
@@ -188,9 +198,69 @@
       isReloadingFeed = false;
     }
   }
+
+  async function addBookmark(url: string): Promise<void> {
+    try {
+      const response = await authenticatedFetch(`${API_BASE_URL}/bookmarks`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url }),
+      });
+
+      if (response.status === 401) {
+        handleAuthError();
+        return;
+      }
+
+      if (!response.ok) {
+        showNotification(`Failed to add bookmark: ${response.status}`, "error");
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      showNotification("Bookmark added successfully!", "success");
+    } catch (error) {
+      console.error("Failed to add bookmark:", error);
+      showNotification("Failed to add bookmark", "error");
+    }
+  }
+
+  function showNotification(
+    message: string,
+    type: "success" | "error" = "success",
+  ): void {
+    if (notificationTimeout) {
+      clearTimeout(notificationTimeout);
+    }
+
+    notification = { message, type };
+
+    notificationTimeout = setTimeout(() => {
+      notification = null;
+      notificationTimeout = null;
+    }, 3000);
+  }
 </script>
 
 <div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+  <!-- Notification Toast -->
+  {#if notification}
+    <div
+      class={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-slide-in ${
+        notification.type === "success"
+          ? "bg-green-600 text-white"
+          : "bg-red-600 text-white"
+      }`}
+    >
+      {#if notification.type === "success"}
+        <Bookmark class="w-5 h-5" />
+      {:else}
+        <AlertCircle class="w-5 h-5" />
+      {/if}
+      <span class="font-medium">{notification.message}</span>
+    </div>
+  {/if}
   <div class="mx-auto max-w-7xl">
     <!-- Page Header -->
     <div class="mb-6">
@@ -306,6 +376,25 @@
                       : ""}
                   </div>
                 {/if}
+
+                <!-- Actions -->
+                <div
+                  class="pt-3 mt-auto border-t border-slate-100 flex justify-end"
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      addBookmark(feed.link);
+                    }}
+                    class="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 px-2"
+                    aria-label="Bookmark this feed"
+                  >
+                    <Bookmark class="w-4 h-4 mr-1" />
+                    Bookmark
+                  </Button>
+                </div>
               </div>
             </div>
           {/each}
@@ -363,3 +452,20 @@
     </div>
   </div>
 </div>
+
+<style>
+  @keyframes slide-in {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  :global(.animate-slide-in) {
+    animation: slide-in 0.3s ease-out;
+  }
+</style>

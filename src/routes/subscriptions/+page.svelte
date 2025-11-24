@@ -50,7 +50,6 @@
 
     isLoading = true;
     try {
-      // Mock API endpoint - will be replaced with actual backend
       const response = await authenticatedFetch(
         `${API_BASE_URL}/subscriptions`,
       );
@@ -74,58 +73,9 @@
       hasMore = data.has_more;
     } catch (error) {
       console.error("Failed to fetch subscriptions:", error);
-      // Mock data for development
-      subscriptions = generateMockSubscriptions();
     } finally {
       isLoading = false;
     }
-  }
-
-  function generateMockSubscriptions(): RSSSubscription[] {
-    return [
-      {
-        id: "1",
-        feed_url: "https://example.com/feed.xml",
-        title: "Tech News Daily",
-        description: "Latest technology news and updates",
-        url: "https://example.com",
-        user_id: "user123",
-        created_at: new Date(
-          Date.now() - 7 * 24 * 60 * 60 * 1000,
-        ).toISOString(),
-        latest_update: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        is_active: true,
-        fetch_frequency_minutes: 60,
-      },
-      {
-        id: "2",
-        feed_url: "https://blog.example.com/rss",
-        title: "Developer Blog",
-        description: "Programming tutorials and best practices",
-        url: "https://blog.example.com",
-        user_id: "user123",
-        created_at: new Date(
-          Date.now() - 14 * 24 * 60 * 60 * 1000,
-        ).toISOString(),
-        latest_update: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-        is_active: true,
-        fetch_frequency_minutes: 30,
-      },
-      {
-        id: "3",
-        feed_url: "https://news.example.org/feed",
-        title: "World News",
-        description: "Global news coverage",
-        url: "https://news.example.org",
-        user_id: "user123",
-        created_at: new Date(
-          Date.now() - 30 * 24 * 60 * 60 * 1000,
-        ).toISOString(),
-        latest_update: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-        is_active: true,
-        fetch_frequency_minutes: 120,
-      },
-    ];
   }
 
   async function addSubscription(): Promise<void> {
@@ -374,7 +324,6 @@
                     </p>
                   {/if}
                 </div>
-
               </div>
 
               <!-- Feed URL -->
