@@ -7,6 +7,6 @@
  * Backend API base URL
  * Change this value to point to a different backend environment
  */
-// export const API_BASE_URL =
-//   "https://athena-443460999135.asia-southeast1.run.app";
-export const API_BASE_URL = "http://localhost:1323";
+export const API_BASE_URL =
+  "https://athena-443460999135.asia-southeast1.run.app";
+// export const API_BASE_URL = "http://localhost:1323";
