@@ -4,7 +4,7 @@
 
 	interface Props extends HTMLButtonAttributes {
 		variant?: 'default' | 'ghost';
-		size?: 'default' | 'icon';
+		size?: 'default' | 'icon' | 'sm';
 		children?: Snippet;
 	}
 
@@ -23,7 +23,8 @@
 
 	const sizeClasses = {
 		default: 'px-4 py-2',
-		icon: 'p-2'
+		icon: 'p-2',
+		sm: 'px-3 py-1.5 text-sm'
 	};
 
 	const baseClasses =
