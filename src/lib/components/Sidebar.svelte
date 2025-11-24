@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
-  import { Home, Rss, LogOut, User, Menu, X } from "lucide-svelte";
+  import { Home, Rss, LogOut, User, Menu, X, Bookmark } from "lucide-svelte";
   import { getUser, removeToken } from "$lib/utils/auth";
   import Button from "./ui/button/Button.svelte";
 
@@ -11,6 +11,7 @@
 
   const navItems = [
     { path: "/", icon: Home, label: "Feed" },
+    { path: "/bookmarks", icon: Bookmark, label: "Bookmarks" },
     { path: "/subscriptions", icon: Rss, label: "Subscriptions" },
   ];
 
