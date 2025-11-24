@@ -336,7 +336,7 @@
 
               <!-- Date Below Image -->
               <div class="px-4 pt-3 pb-2">
-                <span class="text-xs text-slate-500">
+                <span class="text-sm text-slate-500">
                   {formatDate(feed.published_at)}
                 </span>
               </div>
@@ -361,21 +361,11 @@
 
                 <!-- Feed Source -->
                 <p
-                  class="text-xs text-blue-600 mb-3 truncate flex items-center gap-1"
+                  class="text-sm text-blue-600 mb-3 truncate flex items-center gap-1"
                 >
-                  <ExternalLink class="w-3 h-3 flex-shrink-0" />
+                  <ExternalLink class="w-4 h-4 flex-shrink-0" />
                   {extractDomain(feed.link)}
                 </p>
-
-                <!-- Description -->
-                {#if feed.description}
-                  <div class="text-sm text-slate-600 mb-4 line-clamp-4 flex-1">
-                    {@html feed.description.substring(0, 300)}{feed.description
-                      .length > 300
-                      ? "..."
-                      : ""}
-                  </div>
-                {/if}
 
                 <!-- Actions -->
                 <div
