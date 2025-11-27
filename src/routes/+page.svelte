@@ -19,12 +19,14 @@
   import placeholderImage from "$lib/assets/feed-placeholder.svg";
 
   interface FeedItem {
+    id: string;
     title: string;
     main_image_url: string;
     link: string;
     description: string;
     guid: string;
     published_at: string;
+    is_read: boolean;
   }
 
   interface FeedResponse {
@@ -52,8 +54,19 @@
     goto("/login");
   }
 
-  function openFeedLink(url: string): void {
+  async function openFeedLink(feedId: string, url: string): Promise<void> {
+    // Open the link first for immediate user feedback
     window.open(url, "_blank", "noopener,noreferrer");
+
+    // Mark as read in the background
+    const success = await markAsRead(feedId);
+
+    if (success) {
+      // Update the feed's is_read status in the UI
+      feeds = feeds.map((feed) =>
+        feed.id === feedId ? { ...feed, is_read: true } : feed,
+      );
+    }
   }
 
   onMount(() => {
@@ -226,6 +239,33 @@
     }
   }
 
+  async function markAsRead(feedId: string): Promise<boolean> {
+    try {
+      const response = await authenticatedFetch(`${API_BASE_URL}/markread`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ feed_id: feedId }),
+      });
+
+      if (response.status === 401) {
+        handleAuthError();
+        return false;
+      }
+
+      if (!response.ok) {
+        console.error(`Failed to mark as read: ${response.status}`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Failed to mark as read:", error);
+      return false;
+    }
+  }
+
   function showNotification(
     message: string,
     type: "success" | "error" = "success",
@@ -312,26 +352,33 @@
             >
               <!-- Main Image on Top -->
               <div
-                class="w-full h-52 overflow-hidden cursor-pointer"
-                onclick={() => openFeedLink(feed.link)}
+                class="w-full h-52 overflow-hidden cursor-pointer relative"
+                onclick={() => openFeedLink(feed.id, feed.link)}
                 role="button"
                 tabindex="0"
                 onkeydown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    openFeedLink(feed.link);
+                    openFeedLink(feed.id, feed.link);
                   }
                 }}
               >
                 <img
                   src={feed.main_image_url || placeholderImage}
                   alt={feed.title || "Feed image"}
-                  class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  class={`w-full h-full object-cover hover:scale-105 transition-transform duration-300 ${feed.is_read ? "opacity-90 grayscale" : ""}`}
                   onerror={(e) => {
                     const target = e.currentTarget as HTMLImageElement;
                     target.src = placeholderImage;
                   }}
                 />
+                {#if feed.is_read}
+                  <div
+                    class="absolute top-2 right-2 bg-green-600 text-white text-sm font-bold px-3 py-1.5 rounded shadow-lg"
+                  >
+                    READ
+                  </div>
+                {/if}
               </div>
 
               <!-- Date Below Image -->
@@ -346,13 +393,13 @@
                 <!-- Title -->
                 <h3
                   class="text-lg font-semibold text-slate-900 mb-2 line-clamp-2 cursor-pointer hover:text-blue-600 transition-colors"
-                  onclick={() => openFeedLink(feed.link)}
+                  onclick={() => openFeedLink(feed.id, feed.link)}
                   role="button"
                   tabindex="0"
                   onkeydown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      openFeedLink(feed.link);
+                      openFeedLink(feed.id, feed.link);
                     }
                   }}
                 >
