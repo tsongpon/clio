@@ -1,7 +1,14 @@
 <script lang="ts">
   import { Button } from "$lib/components/ui/button";
   import { Input } from "$lib/components/ui/input";
-  import { ExternalLink, Bookmark, Loader2, Plus, AlertCircle, Trash2 } from "lucide-svelte";
+  import {
+    ExternalLink,
+    Bookmark,
+    Loader2,
+    Plus,
+    AlertCircle,
+    Trash2,
+  } from "lucide-svelte";
   import {
     authenticatedFetch,
     isAuthenticated,
@@ -61,7 +68,7 @@
 
   async function fetchBookmarks(
     cursor: string | null = null,
-    append: boolean = false
+    append: boolean = false,
   ): Promise<void> {
     if (isLoading) return;
 
@@ -133,23 +140,19 @@
       }
 
       if (!response.ok) {
-        showNotification(
-          `Failed to add bookmark: ${response.status}`,
-          "error"
-        );
+        showNotification(`Failed to add bookmark: ${response.status}`, "error");
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       newBookmarkUrl = "";
       showNotification("Bookmark added successfully!", "success");
-      
+
       // Refresh the list to show the new bookmark
       // Reset pagination state
       bookmarks = [];
       nextCursor = null;
       hasMore = true;
       await fetchBookmarks();
-      
     } catch (error) {
       console.error("Failed to add bookmark:", error);
       showNotification("Failed to add bookmark", "error");
@@ -166,7 +169,7 @@
         `${API_BASE_URL}/bookmarks/${id}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (response.status === 401) {
@@ -177,7 +180,7 @@
       if (!response.ok) {
         showNotification(
           `Failed to delete bookmark: ${response.status}`,
-          "error"
+          "error",
         );
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -192,7 +195,7 @@
 
   function showNotification(
     message: string,
-    type: "success" | "error" = "success"
+    type: "success" | "error" = "success",
   ): void {
     if (notificationTimeout) {
       clearTimeout(notificationTimeout);
@@ -222,6 +225,12 @@
     } catch {
       return url;
     }
+  }
+
+  function getProxiedImageUrl(imageUrl: string): string {
+    if (!imageUrl) return placeholderImage;
+    // Proxy external images through our backend to avoid CORS issues
+    return `${API_BASE_URL}/proxy/image?url=${encodeURIComponent(imageUrl)}`;
   }
 </script>
 
@@ -328,7 +337,7 @@
                 }}
               >
                 <img
-                  src={bookmark.main_image_url || placeholderImage}
+                  src={getProxiedImageUrl(bookmark.main_image_url)}
                   alt={bookmark.title || "Bookmark image"}
                   class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                   onerror={(e) => {
@@ -374,7 +383,9 @@
                   </p>
                 {/if}
 
-                <div class="pt-3 mt-auto border-t border-slate-100 flex justify-end">
+                <div
+                  class="pt-3 mt-auto border-t border-slate-100 flex justify-end"
+                >
                   <Button
                     variant="ghost"
                     size="sm"

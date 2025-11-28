@@ -316,6 +316,12 @@
       notificationTimeout = null;
     }, 3000);
   }
+
+  function getProxiedImageUrl(imageUrl: string): string {
+    if (!imageUrl) return placeholderImage;
+    // Proxy external images through our backend to avoid CORS issues
+    return `${API_BASE_URL}/proxy/image?url=${encodeURIComponent(imageUrl)}`;
+  }
 </script>
 
 <div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
@@ -414,7 +420,7 @@
                 }}
               >
                 <img
-                  src={feed.main_image_url || placeholderImage}
+                  src={getProxiedImageUrl(feed.main_image_url)}
                   alt={feed.title || "Feed image"}
                   class={`w-full h-full object-cover hover:scale-105 transition-transform duration-300 ${feed.is_read ? "opacity-90 grayscale" : ""}`}
                   onerror={(e) => {
