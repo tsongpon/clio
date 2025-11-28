@@ -47,6 +47,14 @@
   } | null>(null);
   let notificationTimeout: number | null = null;
 
+  // Get current subscription name for display
+  const currentSubscriptionName = $derived.by(() => {
+    const subscriptionId = $page.url.searchParams.get("subscription_id");
+    if (!subscriptionId) return null;
+    // We don't have access to subscriptions here, so we'll just show it's filtered
+    return "Filtered Feed";
+  });
+
   function handleAuthError(): void {
     // Clear invalid token
     removeToken();
@@ -69,6 +77,8 @@
     }
   }
 
+  let previousSubscriptionId = $state<string | null>(null);
+
   onMount(() => {
     // Check if user has a token
     if (!isAuthenticated()) {
@@ -77,7 +87,24 @@
     }
 
     // Load initial data
+    const subscriptionId = $page.url.searchParams.get("subscription_id");
+    previousSubscriptionId = subscriptionId;
     fetchFeeds(null, false, true);
+  });
+
+  // Watch for URL parameter changes and reload feeds
+  $effect(() => {
+    const subscriptionId = $page.url.searchParams.get("subscription_id");
+
+    // Only reload if subscription_id has actually changed
+    if (subscriptionId !== previousSubscriptionId) {
+      previousSubscriptionId = subscriptionId;
+      // Reset feeds and reload when subscription filter changes
+      feeds = [];
+      feedNextCursor = null;
+      feedHasMore = true;
+      fetchFeeds(null, false, false);
+    }
   });
 
   async function fetchFeeds(
@@ -89,10 +116,18 @@
 
     isLoading = true;
     try {
+      // Get subscription_id from URL if present
+      const subscriptionId = $page.url.searchParams.get("subscription_id");
+
       // Build URL with cursor if provided
-      const url = cursor
+      let url = cursor
         ? `${API_BASE_URL}/feeds?next_cursor=${cursor}&page_size=${pageSize}&retrieve_feed=${retrievefeed}`
         : `${API_BASE_URL}/feeds?page_size=${pageSize}&retrieve_feed=${retrievefeed}`;
+
+      // Add subscription_id to URL if present
+      if (subscriptionId) {
+        url += `&subscription_id=${subscriptionId}`;
+      }
 
       const response = await authenticatedFetch(url);
 
@@ -311,21 +346,36 @@
             <div>
               <h1 class="text-3xl font-bold text-gray-900">Feed</h1>
               <p class="text-sm text-gray-600 mt-1">
-                Latest updates from your RSS subscriptions
+                {#if $page.url.searchParams.get("subscription_id")}
+                  Showing feeds from selected subscription
+                {:else}
+                  Latest updates from your RSS subscriptions
+                {/if}
               </p>
             </div>
           </div>
-          <Button
-            onclick={reloadFeed}
-            disabled={isReloadingFeed}
-            class="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50"
-            aria-label="Reload feed"
-          >
-            <RefreshCw
-              class={`w-4 h-4 mr-2 ${isReloadingFeed ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </Button>
+          <div class="flex items-center gap-2">
+            {#if $page.url.searchParams.get("subscription_id")}
+              <Button
+                onclick={() => goto("/")}
+                class="h-10 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium"
+                aria-label="Show all feeds"
+              >
+                Show All
+              </Button>
+            {/if}
+            <Button
+              onclick={reloadFeed}
+              disabled={isReloadingFeed}
+              class="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50"
+              aria-label="Reload feed"
+            >
+              <RefreshCw
+                class={`w-4 h-4 mr-2 ${isReloadingFeed ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </Button>
+          </div>
         </div>
       </div>
     </div>

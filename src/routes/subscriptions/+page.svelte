@@ -18,6 +18,7 @@
   import { goto } from "$app/navigation";
   import { API_BASE_URL } from "$lib/config";
   import type { RSSSubscription } from "$lib/types/subscription";
+  import { subscriptionsStore } from "$lib/stores/subscriptions";
 
   let subscriptions = $state<RSSSubscription[]>([]);
   let nextCursor = $state<string | null>(null);
@@ -119,6 +120,8 @@
       newFeedUrl = "";
       showNotification("Subscription added successfully!", "success");
       await fetchSubscriptions();
+      // Update the global subscriptions store so sidebar updates
+      subscriptionsStore.refresh();
     } catch (error) {
       console.error("Failed to add subscription:", error);
       showNotification("Failed to add subscription", "error");
@@ -155,6 +158,8 @@
 
       showNotification("Subscription removed successfully!", "success");
       await fetchSubscriptions();
+      // Update the global subscriptions store so sidebar updates
+      subscriptionsStore.refresh();
     } catch (error) {
       console.error("Failed to remove subscription:", error);
       // Mock behavior - remove locally

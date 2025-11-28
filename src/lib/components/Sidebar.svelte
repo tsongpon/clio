@@ -4,6 +4,8 @@
   import { Home, Rss, LogOut, User, Menu, X, Bookmark } from "lucide-svelte";
   import { getUser, removeToken } from "$lib/utils/auth";
   import Button from "./ui/button/Button.svelte";
+  import { subscriptionsStore } from "$lib/stores/subscriptions";
+  import { onMount } from "svelte";
 
   let { isMobileMenuOpen = $bindable(false) } = $props();
 
@@ -15,6 +17,10 @@
     { path: "/subscriptions", icon: Rss, label: "Subscriptions" },
   ];
 
+  onMount(() => {
+    subscriptionsStore.fetch();
+  });
+
   function handleLogout() {
     removeToken();
     goto("/login");
@@ -25,8 +31,20 @@
     isMobileMenuOpen = false;
   }
 
+  function navigateToSubscriptionFeed(subscriptionId: string) {
+    goto(`/?subscription_id=${subscriptionId}`);
+    isMobileMenuOpen = false;
+  }
+
   function isActive(path: string): boolean {
     return $page.url.pathname === path;
+  }
+
+  function isSubscriptionActive(subscriptionId: string): boolean {
+    return (
+      $page.url.pathname === "/" &&
+      $page.url.searchParams.get("subscription_id") === subscriptionId
+    );
   }
 </script>
 
@@ -84,6 +102,35 @@
         </li>
       {/each}
     </ul>
+
+    <!-- Subscriptions Section -->
+    {#if $subscriptionsStore.length > 0}
+      <div class="mt-6">
+        <h3
+          class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2"
+        >
+          Subscriptions
+        </h3>
+        <ul class="space-y-1">
+          {#each $subscriptionsStore as subscription}
+            <li>
+              <button
+                onclick={() => navigateToSubscriptionFeed(subscription.id)}
+                class="w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors {isSubscriptionActive(
+                  subscription.id,
+                )
+                  ? 'bg-blue-50 text-blue-600 font-medium'
+                  : 'text-gray-700 hover:bg-gray-50'}"
+                title={subscription.title}
+              >
+                <Rss class="h-4 w-4 flex-shrink-0" />
+                <span class="truncate text-sm">{subscription.title}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
   </nav>
 
   <!-- User Profile Section -->
