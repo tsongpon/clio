@@ -116,15 +116,15 @@
             <li>
               <button
                 onclick={() => navigateToSubscriptionFeed(subscription.id)}
-                class="w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-colors {isSubscriptionActive(
+                class="w-full flex items-center gap-2 px-4 py-2 rounded-lg transition-colors {isSubscriptionActive(
                   subscription.id,
                 )
                   ? 'bg-blue-50 text-blue-600 font-medium'
                   : 'text-gray-700 hover:bg-gray-50'}"
                 title={subscription.title}
               >
-                <Rss class="h-4 w-4 flex-shrink-0" />
-                <span class="truncate text-sm">{subscription.title}</span>
+                <Rss class="h-3 w-3 flex-shrink-0" />
+                <span class="truncate text-xs">{subscription.title}</span>
               </button>
             </li>
           {/each}
