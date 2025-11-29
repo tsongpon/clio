@@ -346,41 +346,17 @@
     <!-- Page Header -->
     <div class="mb-6">
       <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-4">
-            <div class="text-4xl">🌐</div>
-            <div>
-              <h1 class="text-3xl font-bold text-gray-900">Feed</h1>
-              <p class="text-sm text-gray-600 mt-1">
-                {#if $page.url.searchParams.get("subscription_id")}
-                  Showing feeds from selected subscription
-                {:else}
-                  Latest updates from your RSS subscriptions
-                {/if}
-              </p>
-            </div>
-          </div>
-          <div class="flex items-center gap-2">
-            {#if $page.url.searchParams.get("subscription_id")}
-              <Button
-                onclick={() => goto("/")}
-                class="h-10 px-4 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium"
-                aria-label="Show all feeds"
-              >
-                Show All
-              </Button>
-            {/if}
-            <Button
-              onclick={reloadFeed}
-              disabled={isReloadingFeed}
-              class="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50"
-              aria-label="Reload feed"
-            >
-              <RefreshCw
-                class={`w-4 h-4 mr-2 ${isReloadingFeed ? "animate-spin" : ""}`}
-              />
-              Refresh
-            </Button>
+        <div class="flex items-center gap-4">
+          <div class="text-4xl">🌐</div>
+          <div>
+            <h1 class="text-3xl font-bold text-gray-900">Feed</h1>
+            <p class="text-sm text-gray-600 mt-1">
+              {#if $page.url.searchParams.get("subscription_id")}
+                Showing feeds from selected subscription
+              {:else}
+                Latest updates from your RSS subscriptions
+              {/if}
+            </p>
           </div>
         </div>
       </div>

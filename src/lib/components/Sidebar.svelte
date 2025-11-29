@@ -69,7 +69,17 @@
 >
   <!-- Logo/Brand Section -->
   <div class="p-6 border-b border-gray-200">
-    <div class="flex items-center gap-3">
+    <button
+      onclick={() => {
+        if ($page.url.pathname === "/") {
+          window.location.reload();
+        } else {
+          goto("/");
+        }
+      }}
+      class="flex items-center gap-3 w-full hover:opacity-80 transition-opacity"
+      aria-label="Reload feed"
+    >
       <div
         class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center"
       >
@@ -79,7 +89,7 @@
         <h1 class="text-xl font-bold text-gray-900">Clio</h1>
         <p class="text-xs text-gray-500">RSS Feed Reader</p>
       </div>
-    </div>
+    </button>
   </div>
 
   <!-- Navigation Links -->
