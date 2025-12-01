@@ -38,7 +38,7 @@
   let feeds = $state<FeedItem[]>([]);
   let feedNextCursor = $state<string | null>(null);
   let feedHasMore = $state<boolean>(true);
-  let pageSize = $state<number>(18);
+  let pageSize = $state<number>(30);
   let isLoading = $state<boolean>(false);
   let isReloadingFeed = $state<boolean>(false);
   let notification = $state<{
@@ -78,6 +78,7 @@
   }
 
   let previousSubscriptionId = $state<string | null>(null);
+  let scrollTrigger = $state<HTMLElement | null>(null);
 
   onMount(() => {
     // Check if user has a token
@@ -191,6 +192,67 @@
       fetchFeeds(feedNextCursor, true, false);
     }
   }
+
+  // Effect to set up infinite scroll observer
+  $effect(() => {
+    // Watch these reactive values
+    const trigger = scrollTrigger;
+    const hasMore = feedHasMore;
+    const cursor = feedNextCursor;
+    const loading = isLoading;
+
+    if (!trigger || !hasMore || !cursor) {
+      console.log("Skipping observer setup", {
+        trigger: !!trigger,
+        hasMore,
+        cursor,
+      });
+      return;
+    }
+
+    console.log("Setting up IntersectionObserver", {
+      hasMore,
+      cursor,
+      loading,
+    });
+
+    // Create intersection observer for infinite scroll
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          console.log("Intersection event:", {
+            isIntersecting: entry.isIntersecting,
+            feedHasMore,
+            isLoading,
+            feedNextCursor,
+          });
+
+          if (
+            entry.isIntersecting &&
+            feedHasMore &&
+            !isLoading &&
+            feedNextCursor
+          ) {
+            console.log("Triggering load more feeds");
+            loadMoreFeeds();
+          }
+        });
+      },
+      {
+        root: null, // viewport
+        rootMargin: "100px", // Trigger 100px before reaching the element
+        threshold: 0,
+      },
+    );
+
+    observer.observe(trigger);
+
+    // Cleanup
+    return () => {
+      console.log("Cleaning up IntersectionObserver");
+      observer.disconnect();
+    };
+  });
 
   function formatDate(dateString: string): string {
     const date = new Date(dateString);
@@ -363,7 +425,23 @@
     </div>
 
     <div class="space-y-4">
-      {#if feeds.length === 0}
+      {#if isLoading && feeds.length === 0}
+        <!-- Initial Loading State -->
+        <div class="bg-white rounded-lg shadow p-12 text-center">
+          <div class="flex flex-col items-center gap-4">
+            <div
+              class="animate-spin rounded-full h-12 w-12 border-b-3 border-blue-600"
+            ></div>
+            <div>
+              <p class="text-slate-700 font-medium text-base">
+                Loading your feeds...
+              </p>
+              <p class="text-slate-500 text-sm mt-1">This may take a moment</p>
+            </div>
+          </div>
+        </div>
+      {:else if feeds.length === 0}
+        <!-- No Feeds State -->
         <div class="bg-white rounded-lg shadow p-8 text-center">
           <div
             class="bg-slate-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
@@ -470,29 +548,19 @@
         </div>
       {/if}
 
+      <!-- Infinite Scroll Trigger -->
+      {#if feedHasMore && feeds.length > 0 && feedNextCursor}
+        <div bind:this={scrollTrigger} class="w-full h-4"></div>
+      {/if}
+
       <!-- Loading Indicator -->
-      {#if isLoading}
+      {#if isLoading && feeds.length > 0}
         <div class="bg-white rounded-lg shadow p-6 mt-4">
           <div class="flex items-center justify-center gap-3">
             <div
               class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"
             ></div>
             <span class="text-sm text-slate-600">Loading more feeds...</span>
-          </div>
-        </div>
-      {/if}
-
-      <!-- Load More Button (shown when there's more content but not loading) -->
-      {#if feedHasMore && !isLoading && feeds.length > 0 && feedNextCursor}
-        <div class="bg-white rounded-lg shadow p-4 mt-4">
-          <div class="flex justify-center">
-            <Button
-              onclick={() => loadMoreFeeds()}
-              class="h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
-              aria-label="Load more feeds"
-            >
-              Load More
-            </Button>
           </div>
         </div>
       {/if}
