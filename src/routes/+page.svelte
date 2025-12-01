@@ -38,7 +38,7 @@
   let feeds = $state<FeedItem[]>([]);
   let feedNextCursor = $state<string | null>(null);
   let feedHasMore = $state<boolean>(true);
-  let pageSize = $state<number>(30);
+  let pageSize = $state<number>(15);
   let isLoading = $state<boolean>(false);
   let isReloadingFeed = $state<boolean>(false);
   let notification = $state<{
