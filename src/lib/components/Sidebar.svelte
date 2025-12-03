@@ -50,14 +50,14 @@
 
 <!-- Mobile Menu Toggle Button -->
 <button
-  class="fixed top-4 left-4 z-50 lg:hidden rounded-lg bg-white p-2 shadow-md border border-gray-200"
+  class="fixed bottom-6 right-6 z-50 lg:hidden rounded-full bg-blue-500 p-4 shadow-lg hover:bg-blue-600 transition-colors"
   onclick={() => (isMobileMenuOpen = !isMobileMenuOpen)}
   aria-label="Toggle menu"
 >
   {#if isMobileMenuOpen}
-    <X class="h-6 w-6 text-gray-700" />
+    <X class="h-6 w-6 text-white" />
   {:else}
-    <Menu class="h-6 w-6 text-gray-700" />
+    <Menu class="h-6 w-6 text-white" />
   {/if}
 </button>
 
