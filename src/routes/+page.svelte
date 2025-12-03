@@ -446,6 +446,7 @@
           {#each feeds as feed (feed.id)}
             <div
               class="border border-gray-200 rounded-lg hover:border-gray-300 transition-colors overflow-hidden flex flex-col bg-white"
+              style={feed.is_read ? "opacity: 0.6;" : ""}
             >
               <!-- Main Image on Top -->
               <div
@@ -463,7 +464,7 @@
                 <img
                   src={getProxiedImageUrl(feed.main_image_url)}
                   alt={feed.title || "Feed image"}
-                  class={`w-full h-full object-cover hover:scale-105 transition-transform duration-300 ${feed.is_read ? "opacity-60 grayscale" : ""}`}
+                  class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                   onerror={(e) => {
                     const target = e.currentTarget as HTMLImageElement;
                     target.src = placeholderImage;
