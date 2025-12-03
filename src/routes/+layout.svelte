@@ -21,7 +21,7 @@
 </svelte:head>
 
 {#if showSidebar}
-  <div class="flex h-screen overflow-hidden bg-gray-50">
+  <div class="flex h-screen overflow-hidden bg-white">
     <Sidebar bind:isMobileMenuOpen />
 
     <!-- Main Content Area -->
