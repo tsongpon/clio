@@ -386,83 +386,70 @@
   }
 </script>
 
-<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+<div class="min-h-screen bg-white p-4 lg:p-6">
   <!-- Notification Toast -->
   {#if notification}
     <div
-      class={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-slide-in ${
+      class={`fixed top-4 right-4 px-4 py-2 rounded-md shadow-md z-50 flex items-center gap-2 animate-slide-in ${
         notification.type === "success"
           ? "bg-green-600 text-white"
           : "bg-red-600 text-white"
       }`}
     >
       {#if notification.type === "success"}
-        <Bookmark class="w-5 h-5" />
+        <Bookmark class="w-4 h-4" />
       {:else}
-        <AlertCircle class="w-5 h-5" />
+        <AlertCircle class="w-4 h-4" />
       {/if}
-      <span class="font-medium">{notification.message}</span>
+      <span class="text-sm">{notification.message}</span>
     </div>
   {/if}
   <div class="mx-auto max-w-7xl">
     <!-- Page Header -->
-    <div class="mb-6">
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div class="flex items-center gap-4">
-          <div class="text-4xl">🌐</div>
-          <div>
-            <h1 class="text-3xl font-bold text-gray-900">Feed</h1>
-            <p class="text-sm text-gray-600 mt-1">
-              {#if $page.url.searchParams.get("subscription_id")}
-                Showing feeds from selected subscription
-              {:else}
-                Latest updates from your RSS subscriptions
-              {/if}
-            </p>
-          </div>
-        </div>
-      </div>
+    <div class="mb-4">
+      <h1 class="text-2xl font-semibold text-gray-900">
+        {#if $page.url.searchParams.get("subscription_id")}
+          Filtered Feed
+        {:else}
+          All Feed
+        {/if}
+      </h1>
     </div>
 
     <div class="space-y-4">
       {#if isLoading && feeds.length === 0}
         <!-- Initial Loading State -->
-        <div class="bg-white rounded-lg shadow p-12 text-center">
-          <div class="flex flex-col items-center gap-4">
+        <div class="border border-gray-200 rounded-lg p-12 text-center">
+          <div class="flex flex-col items-center gap-3">
             <div
-              class="animate-spin rounded-full h-12 w-12 border-b-3 border-blue-600"
+              class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"
             ></div>
-            <div>
-              <p class="text-slate-700 font-medium text-base">
-                Loading your feeds...
-              </p>
-              <p class="text-slate-500 text-sm mt-1">This may take a moment</p>
-            </div>
+            <p class="text-gray-600 text-sm">Loading your feeds...</p>
           </div>
         </div>
       {:else if feeds.length === 0}
         <!-- No Feeds State -->
-        <div class="bg-white rounded-lg shadow p-8 text-center">
+        <div class="border border-gray-200 rounded-lg p-8 text-center">
           <div
-            class="bg-slate-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+            class="bg-gray-100 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2"
           >
-            <RefreshCw class="w-6 h-6 text-slate-400" />
+            <RefreshCw class="w-5 h-5 text-gray-400" />
           </div>
-          <p class="text-slate-600 font-medium text-sm">No feeds yet</p>
-          <p class="text-slate-400 text-xs mt-1">
+          <p class="text-gray-600 text-sm">No feeds yet</p>
+          <p class="text-gray-400 text-xs mt-1">
             Check back later for updates!
           </p>
         </div>
       {:else}
         <!-- Feed Card Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {#each feeds as feed (feed.id)}
             <div
-              class="bg-white rounded-lg shadow hover:shadow-lg transition-all overflow-hidden flex flex-col"
+              class="border border-gray-200 rounded-lg hover:border-gray-300 transition-colors overflow-hidden flex flex-col bg-white"
             >
               <!-- Main Image on Top -->
               <div
-                class="w-full h-52 overflow-hidden cursor-pointer relative"
+                class="w-full h-48 overflow-hidden cursor-pointer relative"
                 onclick={() => openFeedLink(feed.id, feed.link)}
                 role="button"
                 tabindex="0"
@@ -476,7 +463,7 @@
                 <img
                   src={getProxiedImageUrl(feed.main_image_url)}
                   alt={feed.title || "Feed image"}
-                  class={`w-full h-full object-cover hover:scale-105 transition-transform duration-300 ${feed.is_read ? "opacity-90 grayscale" : ""}`}
+                  class={`w-full h-full object-cover hover:scale-105 transition-transform duration-300 ${feed.is_read ? "opacity-60 grayscale" : ""}`}
                   onerror={(e) => {
                     const target = e.currentTarget as HTMLImageElement;
                     target.src = placeholderImage;
@@ -484,25 +471,18 @@
                 />
                 {#if feed.is_read}
                   <div
-                    class="absolute top-2 right-2 bg-green-600 text-white text-sm font-bold px-3 py-1.5 rounded shadow-lg"
+                    class="absolute top-2 right-2 bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded"
                   >
                     READ
                   </div>
                 {/if}
               </div>
 
-              <!-- Date Below Image -->
-              <div class="px-4 pt-3 pb-2">
-                <span class="text-sm text-slate-500">
-                  {formatDate(feed.published_at)}
-                </span>
-              </div>
-
               <!-- Card Content -->
-              <div class="px-4 pb-4 flex-1 flex flex-col">
+              <div class="p-3 flex-1 flex flex-col">
                 <!-- Title -->
                 <h3
-                  class="text-lg font-semibold text-slate-900 mb-2 line-clamp-2 cursor-pointer hover:text-blue-600 transition-colors"
+                  class="text-base font-medium text-gray-900 mb-2 line-clamp-2 cursor-pointer hover:text-gray-600 transition-colors"
                   onclick={() => openFeedLink(feed.id, feed.link)}
                   role="button"
                   tabindex="0"
@@ -516,17 +496,18 @@
                   {feed.title || "Untitled Feed"}
                 </h3>
 
-                <!-- Feed Source -->
-                <p
-                  class="text-sm text-blue-600 mb-3 truncate flex items-center gap-1"
-                >
-                  <ExternalLink class="w-4 h-4 flex-shrink-0" />
-                  {extractDomain(feed.link)}
-                </p>
+                <!-- Date and Source -->
+                <div class="text-xs text-gray-500 mb-2 space-y-1">
+                  <p class="flex items-center gap-1">
+                    <ExternalLink class="w-3 h-3 flex-shrink-0" />
+                    {extractDomain(feed.link)}
+                  </p>
+                  <p>{formatDate(feed.published_at)}</p>
+                </div>
 
                 <!-- Actions -->
                 <div
-                  class="pt-3 mt-auto border-t border-slate-100 flex justify-end"
+                  class="pt-2 mt-auto border-t border-gray-100 flex justify-end"
                 >
                   <Button
                     variant="ghost"
@@ -535,10 +516,10 @@
                       e.stopPropagation();
                       addBookmark(feed.link);
                     }}
-                    class="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-8 px-2"
+                    class="text-gray-600 hover:text-gray-900 hover:bg-gray-50 h-7 px-2 text-xs"
                     aria-label="Bookmark this feed"
                   >
-                    <Bookmark class="w-4 h-4 mr-1" />
+                    <Bookmark class="w-3 h-3 mr-1" />
                     Bookmark
                   </Button>
                 </div>
@@ -555,31 +536,31 @@
 
       <!-- Loading Indicator -->
       {#if isLoading && feeds.length > 0}
-        <div class="bg-white rounded-lg shadow p-6 mt-4">
-          <div class="flex items-center justify-center gap-3">
+        <div class="border border-gray-200 rounded-lg p-4 mt-4">
+          <div class="flex items-center justify-center gap-2">
             <div
-              class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"
+              class="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"
             ></div>
-            <span class="text-sm text-slate-600">Loading more feeds...</span>
+            <span class="text-sm text-gray-600">Loading more feeds...</span>
           </div>
         </div>
       {/if}
 
       <!-- End of List Indicator -->
       {#if !feedHasMore && feeds.length > 0}
-        <div class="bg-white rounded-lg shadow p-4 mt-4">
-          <div class="flex flex-col items-center gap-3">
-            <p class="text-center text-sm text-slate-500">
+        <div class="border border-gray-200 rounded-lg p-4 mt-4">
+          <div class="flex flex-col items-center gap-2">
+            <p class="text-center text-sm text-gray-500">
               You've reached the end of your feeds
             </p>
             <Button
               onclick={reloadFeed}
               disabled={isReloadingFeed}
-              class="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              class="h-8 px-3 bg-gray-900 hover:bg-gray-800 text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Reload feed"
             >
               <RefreshCw
-                class={`w-4 h-4 mr-2 ${isReloadingFeed ? "animate-spin" : ""}`}
+                class={`w-4 h-4 mr-1.5 ${isReloadingFeed ? "animate-spin" : ""}`}
               />
               {isReloadingFeed ? "Reloading..." : "Reload Feed"}
             </Button>

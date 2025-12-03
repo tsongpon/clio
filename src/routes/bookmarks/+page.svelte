@@ -234,43 +234,33 @@
   }
 </script>
 
-<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+<div class="min-h-screen bg-white p-4 lg:p-6">
   <!-- Notification Toast -->
   {#if notification}
     <div
-      class={`fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2 animate-slide-in ${
+      class={`fixed top-4 right-4 px-4 py-2 rounded-md shadow-md z-50 flex items-center gap-2 animate-slide-in ${
         notification.type === "success"
           ? "bg-green-600 text-white"
           : "bg-red-600 text-white"
       }`}
     >
       {#if notification.type === "success"}
-        <Bookmark class="w-5 h-5" />
+        <Bookmark class="w-4 h-4" />
       {:else}
-        <AlertCircle class="w-5 h-5" />
+        <AlertCircle class="w-4 h-4" />
       {/if}
-      <span class="font-medium">{notification.message}</span>
+      <span class="text-sm">{notification.message}</span>
     </div>
   {/if}
 
   <div class="mx-auto max-w-7xl">
     <!-- Page Header -->
-    <div class="mb-6">
-      <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div class="flex items-center gap-4">
-          <div class="text-4xl">🔖</div>
-          <div>
-            <h1 class="text-3xl font-bold text-gray-900">Bookmarks</h1>
-            <p class="text-sm text-gray-600 mt-1">
-              Your saved articles and links
-            </p>
-          </div>
-        </div>
-      </div>
+    <div class="mb-4">
+      <h1 class="text-2xl font-semibold text-gray-900">Bookmarks</h1>
     </div>
 
     <!-- Add Bookmark Form -->
-    <div class="bg-white rounded-lg shadow p-4 mb-6">
+    <div class="border border-gray-200 rounded-lg p-4 mb-4">
       <div class="flex gap-2">
         <Input
           id="bookmark-input"
@@ -282,13 +272,13 @@
               addBookmark();
             }
           }}
-          class="flex-1 h-10 rounded-lg"
+          class="flex-1 h-9 rounded-md"
           disabled={isAddingBookmark}
         />
         <Button
           onclick={addBookmark}
           disabled={isAddingBookmark || !newBookmarkUrl.trim()}
-          class="h-10 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          class="h-9 px-3 bg-gray-900 hover:bg-gray-800 text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {#if isAddingBookmark}
             <div class="flex items-center gap-2">
@@ -297,7 +287,7 @@
             </div>
           {:else}
             <Plus class="w-4 h-4 mr-1" />
-            <span>Add Bookmark</span>
+            <span>Add</span>
           {/if}
         </Button>
       </div>
@@ -305,27 +295,27 @@
 
     <div class="space-y-4">
       {#if bookmarks.length === 0 && !isLoading}
-        <div class="bg-white rounded-lg shadow p-8 text-center">
+        <div class="border border-gray-200 rounded-lg p-8 text-center">
           <div
-            class="bg-slate-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3"
+            class="bg-gray-100 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2"
           >
-            <Bookmark class="w-6 h-6 text-slate-400" />
+            <Bookmark class="w-5 h-5 text-gray-400" />
           </div>
-          <p class="text-slate-600 font-medium text-sm">No bookmarks yet</p>
-          <p class="text-slate-400 text-xs mt-1">
+          <p class="text-gray-600 text-sm">No bookmarks yet</p>
+          <p class="text-gray-400 text-xs mt-1">
             Save interesting articles to read later!
           </p>
         </div>
       {:else}
         <!-- Bookmark Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {#each bookmarks as bookmark (bookmark.id)}
             <div
-              class="bg-white rounded-lg shadow hover:shadow-lg transition-all overflow-hidden flex flex-col"
+              class="border border-gray-200 rounded-lg hover:border-gray-300 transition-colors overflow-hidden flex flex-col bg-white"
             >
               <!-- Main Image -->
               <div
-                class="w-full h-48 overflow-hidden cursor-pointer bg-slate-100"
+                class="w-full h-48 overflow-hidden cursor-pointer bg-gray-100"
                 onclick={() => openLink(bookmark.url)}
                 role="button"
                 tabindex="0"
@@ -348,15 +338,9 @@
               </div>
 
               <!-- Content -->
-              <div class="p-4 flex-1 flex flex-col">
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="text-xs text-slate-500">
-                    {formatDate(bookmark.created_at)}
-                  </span>
-                </div>
-
+              <div class="p-3 flex-1 flex flex-col">
                 <h3
-                  class="text-lg font-semibold text-slate-900 mb-2 line-clamp-2 cursor-pointer hover:text-blue-600 transition-colors"
+                  class="text-base font-medium text-gray-900 mb-2 line-clamp-2 cursor-pointer hover:text-gray-600 transition-colors"
                   onclick={() => openLink(bookmark.url)}
                   role="button"
                   tabindex="0"
@@ -370,21 +354,22 @@
                   {bookmark.title || "Untitled Bookmark"}
                 </h3>
 
-                <p
-                  class="text-xs text-blue-600 mb-3 truncate flex items-center gap-1"
-                >
-                  <ExternalLink class="w-3 h-3 flex-shrink-0" />
-                  {extractDomain(bookmark.url)}
-                </p>
+                <div class="text-xs text-gray-500 mb-2 space-y-1">
+                  <p class="flex items-center gap-1">
+                    <ExternalLink class="w-3 h-3 flex-shrink-0" />
+                    {extractDomain(bookmark.url)}
+                  </p>
+                  <p>{formatDate(bookmark.created_at)}</p>
+                </div>
 
                 {#if bookmark.content_summary}
-                  <p class="text-sm text-slate-600 line-clamp-3 mb-4 flex-1">
+                  <p class="text-xs text-gray-600 line-clamp-2 mb-3 flex-1">
                     {bookmark.content_summary}
                   </p>
                 {/if}
 
                 <div
-                  class="pt-3 mt-auto border-t border-slate-100 flex justify-end"
+                  class="pt-2 mt-auto border-t border-gray-100 flex justify-end"
                 >
                   <Button
                     variant="ghost"
@@ -393,10 +378,10 @@
                       e.stopPropagation();
                       deleteBookmark(bookmark.id);
                     }}
-                    class="text-red-600 hover:text-red-700 hover:bg-red-50 h-8 px-2"
+                    class="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 px-2 text-xs"
                     aria-label="Delete bookmark"
                   >
-                    <Trash2 class="w-4 h-4 mr-1" />
+                    <Trash2 class="w-3 h-3 mr-1" />
                     Delete
                   </Button>
                 </div>
@@ -408,21 +393,21 @@
 
       <!-- Loading Indicator -->
       {#if isLoading}
-        <div class="bg-white rounded-lg shadow p-6 mt-4">
-          <div class="flex items-center justify-center gap-3">
-            <Loader2 class="animate-spin w-6 h-6 text-blue-600" />
-            <span class="text-sm text-slate-600">Loading bookmarks...</span>
+        <div class="border border-gray-200 rounded-lg p-4 mt-4">
+          <div class="flex items-center justify-center gap-2">
+            <Loader2 class="animate-spin w-5 h-5 text-gray-900" />
+            <span class="text-sm text-gray-600">Loading bookmarks...</span>
           </div>
         </div>
       {/if}
 
       <!-- Load More Button -->
       {#if hasMore && !isLoading && bookmarks.length > 0}
-        <div class="bg-white rounded-lg shadow p-4 mt-4">
+        <div class="border border-gray-200 rounded-lg p-4 mt-4">
           <div class="flex justify-center">
             <Button
               onclick={() => loadMore()}
-              class="h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+              class="h-8 px-4 bg-gray-900 hover:bg-gray-800 text-white rounded-md text-sm"
             >
               Load More
             </Button>
@@ -432,8 +417,8 @@
 
       <!-- End of List -->
       {#if !hasMore && bookmarks.length > 0}
-        <div class="bg-white rounded-lg shadow p-4 mt-4 text-center">
-          <p class="text-sm text-slate-500">
+        <div class="border border-gray-200 rounded-lg p-4 mt-4 text-center">
+          <p class="text-sm text-gray-500">
             You've reached the end of your bookmarks
           </p>
         </div>
