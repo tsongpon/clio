@@ -1,9 +1,8 @@
 <svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="128" height="128" rx="24" fill="white"/>
-  <circle cx="64" cy="64" r="52" fill="#FFF7ED"/>
+  <rect width="128" height="128" rx="24" fill="#FF6600"/>
 
-  <!-- RSS icon with orange -->
-  <circle cx="48" cy="80" r="6" fill="#F97316"/>
-  <path d="M44 60C56.1503 60 66 69.8497 66 82" stroke="#F97316" stroke-width="6" stroke-linecap="round"/>
-  <path d="M44 40C67.196 40 86 58.804 86 82" stroke="#FB923C" stroke-width="6" stroke-linecap="round"/>
+  <!-- RSS icon in white on bold orange -->
+  <circle cx="48" cy="80" r="6" fill="white"/>
+  <path d="M44 60C56.1503 60 66 69.8497 66 82" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  <path d="M44 40C67.196 40 86 58.804 86 82" stroke="white" stroke-width="6" stroke-linecap="round"/>
 </svg>

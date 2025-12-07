@@ -392,8 +392,8 @@
     <div
       class={`fixed top-4 right-4 px-4 py-2 rounded-md shadow-md z-50 flex items-center gap-2 animate-slide-in ${
         notification.type === "success"
-          ? "bg-green-600 text-white"
-          : "bg-red-600 text-white"
+          ? "bg-[#FF6600] text-white"
+          : "bg-red-500 text-white"
       }`}
     >
       {#if notification.type === "success"}
@@ -419,21 +419,21 @@
     <div class="space-y-4">
       {#if isLoading && feeds.length === 0}
         <!-- Initial Loading State -->
-        <div class="border border-gray-200 rounded-lg p-12 text-center">
+        <div class="border border-[#FFD4B3] rounded-lg p-12 text-center">
           <div class="flex flex-col items-center gap-3">
             <div
-              class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"
+              class="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF6600]"
             ></div>
             <p class="text-gray-600 text-sm">Loading your feeds...</p>
           </div>
         </div>
       {:else if feeds.length === 0}
         <!-- No Feeds State -->
-        <div class="border border-gray-200 rounded-lg p-8 text-center">
+        <div class="border border-[#FFD4B3] rounded-lg p-8 text-center">
           <div
-            class="bg-gray-100 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2"
+            class="bg-[#FFE6D5] w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2"
           >
-            <RefreshCw class="w-5 h-5 text-gray-400" />
+            <RefreshCw class="w-5 h-5 text-[#FF6600]" />
           </div>
           <p class="text-gray-600 text-sm">No feeds yet</p>
           <p class="text-gray-400 text-xs mt-1">
@@ -445,7 +445,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {#each feeds as feed (feed.id)}
             <div
-              class="border border-gray-200 rounded-lg hover:border-gray-300 transition-colors overflow-hidden flex flex-col bg-white"
+              class="border border-[#FFD4B3] rounded-lg hover:border-[#FF9940] transition-colors overflow-hidden flex flex-col bg-white"
               style={feed.is_read ? "opacity: 0.6;" : ""}
             >
               <!-- Main Image on Top -->
@@ -472,7 +472,7 @@
                 />
                 {#if feed.is_read}
                   <div
-                    class="absolute top-2 right-2 bg-gray-900 text-white text-xs font-medium px-2 py-1 rounded"
+                    class="absolute top-2 right-2 bg-[#FF6600] text-white text-xs font-medium px-2 py-1 rounded"
                   >
                     READ
                   </div>
@@ -508,7 +508,7 @@
 
                 <!-- Actions -->
                 <div
-                  class="pt-2 mt-auto border-t border-gray-100 flex justify-end"
+                  class="pt-2 mt-auto border-t border-orange-50 flex justify-end"
                 >
                   <Button
                     variant="ghost"
@@ -517,7 +517,7 @@
                       e.stopPropagation();
                       addBookmark(feed.link);
                     }}
-                    class="text-gray-600 hover:text-gray-900 hover:bg-gray-50 h-7 px-2 text-xs"
+                    class="text-gray-600 hover:text-[#FF6600] hover:bg-[#FFE6D5] h-7 px-2 text-xs"
                     aria-label="Bookmark this feed"
                   >
                     <Bookmark class="w-3 h-3 mr-1" />
@@ -537,10 +537,10 @@
 
       <!-- Loading Indicator -->
       {#if isLoading && feeds.length > 0}
-        <div class="border border-gray-200 rounded-lg p-4 mt-4">
+        <div class="border border-[#FFD4B3] rounded-lg p-4 mt-4">
           <div class="flex items-center justify-center gap-2">
             <div
-              class="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"
+              class="animate-spin rounded-full h-5 w-5 border-b-2 border-[#FF6600]"
             ></div>
             <span class="text-sm text-gray-600">Loading more feeds...</span>
           </div>
@@ -549,7 +549,7 @@
 
       <!-- End of List Indicator -->
       {#if !feedHasMore && feeds.length > 0}
-        <div class="border border-gray-200 rounded-lg p-4 mt-4">
+        <div class="border border-[#FFD4B3] rounded-lg p-4 mt-4">
           <div class="flex flex-col items-center gap-2">
             <p class="text-center text-sm text-gray-500">
               You've reached the end of your feeds
@@ -557,7 +557,7 @@
             <Button
               onclick={reloadFeed}
               disabled={isReloadingFeed}
-              class="h-8 px-3 bg-gray-900 hover:bg-gray-800 text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              class="h-8 px-3 bg-[#FF6600] hover:bg-[#FF8533] text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Reload feed"
             >
               <RefreshCw

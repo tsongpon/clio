@@ -214,8 +214,8 @@
     <div
       class={`fixed top-4 right-4 px-4 py-2 rounded-md shadow-md z-50 flex items-center gap-2 animate-slide-in ${
         notification.type === "success"
-          ? "bg-green-600 text-white"
-          : "bg-red-600 text-white"
+          ? "bg-[#FF6600] text-white"
+          : "bg-red-500 text-white"
       }`}
     >
       {#if notification.type === "success"}
@@ -234,7 +234,7 @@
     </div>
 
     <!-- Add Subscription Form -->
-    <div class="border border-gray-200 rounded-lg p-4 mb-4">
+    <div class="border border-[#FFD4B3] rounded-lg p-4 mb-4">
       <div class="flex gap-2">
         <Input
           id="subscription-input"
@@ -246,13 +246,13 @@
               addSubscription();
             }
           }}
-          class="flex-1 h-9 rounded-md"
+          class="flex-1 h-9 rounded-md border-[#FFBA80] focus:border-[#FF6600] focus:ring-[#FF6600]"
           disabled={isAddingFeed}
         />
         <Button
           onclick={addSubscription}
           disabled={isAddingFeed || !newFeedUrl.trim()}
-          class="h-9 px-3 bg-gray-900 hover:bg-gray-800 text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          class="h-9 px-3 bg-[#FF6600] hover:bg-[#FF8533] text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {#if isAddingFeed}
             <div class="flex items-center gap-2">
@@ -278,20 +278,20 @@
       </div>
 
       {#if isLoading}
-        <div class="border border-gray-200 rounded-lg p-6">
+        <div class="border border-[#FFD4B3] rounded-lg p-6">
           <div class="flex items-center justify-center gap-2">
             <div
-              class="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"
+              class="animate-spin rounded-full h-5 w-5 border-b-2 border-[#FF6600]"
             ></div>
             <span class="text-sm text-gray-600">Loading subscriptions...</span>
           </div>
         </div>
       {:else if subscriptions.length === 0}
-        <div class="border border-gray-200 rounded-lg p-8 text-center">
+        <div class="border border-[#FFD4B3] rounded-lg p-8 text-center">
           <div
-            class="bg-gray-100 w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2"
+            class="bg-[#FFE6D5] w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2"
           >
-            <Rss class="w-5 h-5 text-gray-400" />
+            <Rss class="w-5 h-5 text-[#FF6600]" />
           </div>
           <p class="text-gray-600 text-sm">No subscriptions yet</p>
           <p class="text-gray-400 text-xs mt-1">
@@ -303,7 +303,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           {#each subscriptions as subscription (subscription.id)}
             <div
-              class="border border-gray-200 rounded-lg hover:border-gray-300 transition-colors p-3"
+              class="border border-[#FFD4B3] rounded-lg hover:border-[#FF9940] transition-colors p-3"
             >
               <!-- Header -->
               <div class="flex items-start justify-between mb-2">
@@ -354,7 +354,7 @@
 
               <!-- Actions -->
               <div
-                class="flex items-center gap-2 pt-2 border-t border-gray-100"
+                class="flex items-center gap-2 pt-2 border-t border-orange-50"
               >
                 <Button
                   variant="ghost"
@@ -363,7 +363,7 @@
                     e.stopPropagation();
                     removeSubscription(subscription.id);
                   }}
-                  class="flex-1 h-8 text-red-600 hover:text-red-700 hover:bg-red-50 transition-colors text-xs"
+                  class="flex-1 h-8 text-[#FF6600] hover:text-[#FF8533] hover:bg-[#FFE6D5] transition-colors text-xs"
                   aria-label="Unsubscribe"
                 >
                   <UserMinus class="w-3 h-3 mr-1" />

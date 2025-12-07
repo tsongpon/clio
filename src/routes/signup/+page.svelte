@@ -125,19 +125,19 @@
 </script>
 
 <div
-  class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4"
+  class="min-h-screen bg-gradient-to-br from-[#FFF5EE] to-white flex items-center justify-center p-4"
 >
   <div class="w-full max-w-md">
     <div class="text-center mb-8">
       <div
-        class="bg-blue-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
+        class="bg-[#FF6600] w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg"
       >
         <UserPlus class="w-8 h-8 text-white" />
       </div>
-      <h1 class="text-3xl font-bold tracking-tight text-slate-900 mb-2">
+      <h1 class="text-3xl font-bold tracking-tight text-gray-900 mb-2">
         Create Account
       </h1>
-      <p class="text-slate-600">Sign up to start managing your bookmarks</p>
+      <p class="text-gray-600">Sign up to start managing your feeds</p>
     </div>
 
     <Card class="bg-white rounded-xl shadow-xl p-8">
@@ -151,7 +151,7 @@
         <div>
           <label
             for="name"
-            class="block text-sm font-medium text-slate-700 mb-2"
+            class="block text-sm font-medium text-gray-700 mb-2"
           >
             Name
           </label>
@@ -159,7 +159,7 @@
             <div
               class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
             >
-              <User class="h-5 w-5 text-slate-400" />
+              <User class="h-5 w-5 text-gray-400" />
             </div>
             <Input
               id="name"
@@ -168,7 +168,7 @@
               bind:value={name}
               onkeypress={handleKeyPress}
               disabled={isLoading}
-              class="pl-10 h-11 rounded-lg"
+              class="pl-10 h-11 rounded-lg border-[#FFBA80] focus:border-[#FF6600] focus:ring-[#FF6600]"
               autocomplete="name"
             />
           </div>
@@ -177,7 +177,7 @@
         <div>
           <label
             for="email"
-            class="block text-sm font-medium text-slate-700 mb-2"
+            class="block text-sm font-medium text-gray-700 mb-2"
           >
             Email Address
           </label>
@@ -185,7 +185,7 @@
             <div
               class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
             >
-              <Mail class="h-5 w-5 text-slate-400" />
+              <Mail class="h-5 w-5 text-gray-400" />
             </div>
             <Input
               id="email"
@@ -194,7 +194,7 @@
               bind:value={email}
               onkeypress={handleKeyPress}
               disabled={isLoading}
-              class="pl-10 h-11 rounded-lg"
+              class="pl-10 h-11 rounded-lg border-[#FFBA80] focus:border-[#FF6600] focus:ring-[#FF6600]"
               autocomplete="email"
             />
           </div>
@@ -203,7 +203,7 @@
         <div>
           <label
             for="password"
-            class="block text-sm font-medium text-slate-700 mb-2"
+            class="block text-sm font-medium text-gray-700 mb-2"
           >
             Password
           </label>
@@ -211,7 +211,7 @@
             <div
               class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
             >
-              <Lock class="h-5 w-5 text-slate-400" />
+              <Lock class="h-5 w-5 text-gray-400" />
             </div>
             <Input
               id="password"
@@ -220,7 +220,7 @@
               bind:value={password}
               onkeypress={handleKeyPress}
               disabled={isLoading}
-              class="pl-10 h-11 rounded-lg"
+              class="pl-10 h-11 rounded-lg border-[#FFBA80] focus:border-[#FF6600] focus:ring-[#FF6600]"
               autocomplete="new-password"
             />
           </div>
@@ -229,7 +229,7 @@
         <div>
           <label
             for="confirm-password"
-            class="block text-sm font-medium text-slate-700 mb-2"
+            class="block text-sm font-medium text-gray-700 mb-2"
           >
             Confirm Password
           </label>
@@ -237,7 +237,7 @@
             <div
               class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
             >
-              <Lock class="h-5 w-5 text-slate-400" />
+              <Lock class="h-5 w-5 text-gray-400" />
             </div>
             <Input
               id="confirm-password"
@@ -246,7 +246,7 @@
               bind:value={confirmPassword}
               onkeypress={handleKeyPress}
               disabled={isLoading}
-              class="pl-10 h-11 rounded-lg"
+              class="pl-10 h-11 rounded-lg border-[#FFBA80] focus:border-[#FF6600] focus:ring-[#FF6600]"
               autocomplete="new-password"
             />
           </div>
@@ -265,16 +265,19 @@
           type="submit"
           onclick={handleSignup}
           disabled={isLoading}
-          class="w-full h-11 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-base shadow-lg hover:shadow-xl transition-all"
+          class="w-full h-11 bg-[#FF6600] hover:bg-[#FF8533] rounded-lg font-semibold text-base shadow-lg hover:shadow-xl transition-all"
         >
           {isLoading ? "Creating Account..." : "Create Account"}
         </Button>
       </form>
     </Card>
 
-    <p class="text-center text-sm text-slate-600 mt-6">
+    <p class="text-center text-sm text-gray-600 mt-6">
       Already have an account?
-      <a href="/login" class="text-blue-600 hover:text-blue-700 font-medium">
+      <a
+        href="/login"
+        class="text-[#FF6600] hover:text-[#FF6600] font-medium"
+      >
         Sign in
       </a>
     </p>

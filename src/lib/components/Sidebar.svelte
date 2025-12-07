@@ -51,7 +51,7 @@
 
 <!-- Mobile Menu Toggle Button -->
 <button
-  class="fixed bottom-6 right-6 z-50 lg:hidden rounded-full bg-blue-500 p-4 shadow-lg hover:bg-blue-600 transition-colors"
+  class="fixed bottom-6 right-6 z-50 lg:hidden rounded-full bg-[#FF6600] p-4 shadow-lg hover:bg-[#FF8533] transition-colors"
   onclick={() => (isMobileMenuOpen = !isMobileMenuOpen)}
   aria-label="Toggle menu"
 >
@@ -69,7 +69,7 @@
     : '-translate-x-full lg:translate-x-0'}"
 >
   <!-- Logo/Brand Section -->
-  <div class="px-4 py-3 border-b border-gray-200">
+  <div class="px-4 py-3 border-b-2 border-[#FF6600]">
     <button
       onclick={() => {
         if ($page.url.pathname === "/") {
@@ -78,7 +78,7 @@
           goto("/");
         }
       }}
-      class="flex items-center w-full hover:opacity-70 transition-opacity"
+      class="flex items-center w-full hover:opacity-80 transition-opacity"
       aria-label="Reload feed"
     >
       <img src={logo} alt="feedit.live" class="h-8" />
@@ -96,8 +96,8 @@
             class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors {isActive(
               item.path,
             )
-              ? 'bg-blue-50 text-blue-600 font-medium'
-              : 'text-gray-700 hover:bg-gray-50'}"
+              ? 'bg-[#FF6600] text-white font-semibold'
+              : 'text-gray-700 hover:bg-[#FFE6D5]'}"
           >
             <Icon class="h-5 w-5" />
             <span>{item.label}</span>
@@ -110,7 +110,7 @@
     {#if $subscriptionsStore.length > 0}
       <div class="mt-6">
         <h3
-          class="px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2"
+          class="px-4 text-xs font-bold text-[#FF6600] uppercase tracking-wider mb-2"
         >
           Subscriptions
         </h3>
@@ -122,8 +122,8 @@
                 class="w-full flex items-center gap-2 px-4 py-2 rounded-lg transition-colors {isSubscriptionActive(
                   subscription.id,
                 )
-                  ? 'bg-blue-50 text-blue-600 font-medium'
-                  : 'text-gray-700 hover:bg-gray-50'}"
+                  ? 'bg-[#FF6600] text-white font-semibold'
+                  : 'text-gray-700 hover:bg-[#FFE6D5]'}"
                 title={subscription.title}
               >
                 <Rss class="h-3 w-3 flex-shrink-0" />
@@ -137,17 +137,17 @@
   </nav>
 
   <!-- User Profile Section -->
-  <div class="p-4 border-t border-gray-200">
+  <div class="p-4 border-t-2 border-[#FF6600]">
     {#if user}
       <div class="mb-3 px-2">
         <div class="flex items-center gap-3 mb-2">
           <div
-            class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center"
+            class="w-10 h-10 bg-[#FF6600] rounded-full flex items-center justify-center"
           >
-            <User class="h-5 w-5 text-gray-600" />
+            <User class="h-5 w-5 text-white" />
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 truncate">
+            <p class="text-sm font-semibold text-gray-900 truncate">
               {user.name || "User"}
             </p>
             <p class="text-xs text-gray-500 truncate">{user.email || ""}</p>
@@ -157,7 +157,7 @@
       <Button
         onclick={handleLogout}
         variant="ghost"
-        class="w-full justify-start gap-2"
+        class="w-full justify-start gap-2 hover:bg-[#FFE6D5] hover:text-[#FF6600] font-medium"
       >
         <LogOut class="h-4 w-4" />
         Logout
