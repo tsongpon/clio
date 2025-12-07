@@ -311,7 +311,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {#each bookmarks as bookmark (bookmark.id)}
             <div
-              class="border border-[#FFD4B3] rounded-lg hover:border-[#FF9940] transition-colors overflow-hidden flex flex-col bg-white"
+              class="rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col bg-white"
             >
               <!-- Main Image -->
               <div
