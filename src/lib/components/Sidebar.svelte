@@ -6,6 +6,7 @@
   import Button from "./ui/button/Button.svelte";
   import { subscriptionsStore } from "$lib/stores/subscriptions";
   import { onMount } from "svelte";
+  import logo from "$lib/assets/logo.svg";
 
   let { isMobileMenuOpen = $bindable(false) } = $props();
 
@@ -77,10 +78,10 @@
           goto("/");
         }
       }}
-      class="flex items-center gap-2 w-full hover:opacity-70 transition-opacity"
+      class="flex items-center w-full hover:opacity-70 transition-opacity"
       aria-label="Reload feed"
     >
-      <h1 class="text-lg font-semibold text-gray-900">feedit.live</h1>
+      <img src={logo} alt="feedit.live" class="h-8" />
     </button>
   </div>
 

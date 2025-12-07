@@ -1,4 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-  <rect width="128" height="128" rx="16" fill="#3b82f6"/>
-  <path d="M40 32 L88 32 C92.4183 32 96 35.5817 96 40 L96 100 C96 102.761 93.7614 105 91 105 C89.8954 105 88.8352 104.552 88.0503 103.754 L64 79.0909 L39.9497 103.754 C37.8543 105.899 34.3957 105.935 32.2503 103.84 C31.4396 103.049 31 102.003 31 100.914 L32 40 C32 35.5817 35.5817 32 40 32 Z" fill="white"/>
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="128" height="128" rx="24" fill="white"/>
+  <circle cx="64" cy="64" r="52" fill="#FFF7ED"/>
+
+  <!-- RSS icon with orange -->
+  <circle cx="48" cy="80" r="6" fill="#F97316"/>
+  <path d="M44 60C56.1503 60 66 69.8497 66 82" stroke="#F97316" stroke-width="6" stroke-linecap="round"/>
+  <path d="M44 40C67.196 40 86 58.804 86 82" stroke="#FB923C" stroke-width="6" stroke-linecap="round"/>
 </svg>
