@@ -3,8 +3,6 @@
   import { Input } from "$lib/components/ui/input";
   import { Card } from "$lib/components/ui/card";
   import { Lock, Mail, UserPlus, User } from "lucide-svelte";
-  import { goto } from "$app/navigation";
-  import { setToken } from "$lib/utils/auth";
   import { API_BASE_URL } from "$lib/config";
 
   let name = $state<string>("");
@@ -13,6 +11,7 @@
   let confirmPassword = $state<string>("");
   let errorMessage = $state<string>("");
   let isLoading = $state<boolean>(false);
+  let successMessage = $state<string>("");
 
   function validateForm(): boolean {
     // Reset error message
@@ -64,6 +63,7 @@
 
     isLoading = true;
     errorMessage = "";
+    successMessage = "";
 
     try {
       const response = await fetch(`${API_BASE_URL}/users`, {
@@ -91,21 +91,15 @@
 
       const data = await response.json();
 
-      // If backend returns a token on signup, store it and redirect
-      if (data.token) {
-        setToken(data.token);
+      successMessage =
+        data?.message ||
+        "Account created! Please check your email for a verification link before logging in.";
 
-        // Optionally store user info if returned
-        if (data.user) {
-          localStorage.setItem("user", JSON.stringify(data.user));
-        }
-
-        // Redirect to home page
-        goto("/");
-      } else {
-        // If no token returned, redirect to login page
-        goto("/login");
-      }
+      // Reset form fields so user knows submission succeeded
+      name = "";
+      email = "";
+      password = "";
+      confirmPassword = "";
     } catch (error) {
       console.error("Signup failed:", error);
       errorMessage =
@@ -148,6 +142,15 @@
         }}
         class="space-y-6"
       >
+        {#if successMessage}
+          <div
+            class="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm"
+            role="status"
+          >
+            {successMessage}
+          </div>
+        {/if}
+
         <div>
           <label
             for="name"
@@ -274,10 +277,7 @@
 
     <p class="text-center text-sm text-gray-600 mt-6">
       Already have an account?
-      <a
-        href="/login"
-        class="text-[#FF6600] hover:text-[#FF6600] font-medium"
-      >
+      <a href="/login" class="text-[#FF6600] hover:text-[#FF6600] font-medium">
         Sign in
       </a>
     </p>

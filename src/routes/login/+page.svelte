@@ -36,6 +36,9 @@
         if (response.status === 401) {
           throw new Error("Invalid email or password");
         }
+        if (response.status === 403) {
+          throw new Error("Forbidden");
+        }
         throw new Error(`Authentication failed: ${response.status}`);
       }
 
@@ -171,10 +174,7 @@
 
     <p class="text-center text-sm text-gray-600 mt-6">
       Don't have an account?
-      <a
-        href="/signup"
-        class="text-[#FF6600] hover:text-[#FF6600] font-medium"
-      >
+      <a href="/signup" class="text-[#FF6600] hover:text-[#FF6600] font-medium">
         Sign up
       </a>
     </p>
