@@ -17,6 +17,10 @@
 </script>
 
 <svelte:head>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"
+  />
   <link rel="icon" href={favicon} />
 </svelte:head>
 
@@ -25,7 +29,10 @@
     <Sidebar bind:isMobileMenuOpen />
 
     <!-- Main Content Area -->
-    <main class="flex-1 overflow-y-auto lg:ml-64">
+    <main
+      class="flex-1 overflow-y-auto lg:ml-60 bg-gray-50"
+      style="touch-action: pan-y pinch-zoom;"
+    >
       <div class="min-h-full">
         {@render children?.()}
       </div>

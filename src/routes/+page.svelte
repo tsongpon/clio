@@ -79,6 +79,7 @@
 
   let previousSubscriptionId = $state<string | null>(null);
   let scrollTrigger = $state<HTMLElement | null>(null);
+  let isInitialized = $state<boolean>(false);
 
   onMount(() => {
     // Check if user has a token
@@ -90,11 +91,15 @@
     // Load initial data
     const subscriptionId = $page.url.searchParams.get("subscription_id");
     previousSubscriptionId = subscriptionId;
+    isInitialized = true;
     fetchFeeds(null, false, true);
   });
 
   // Watch for URL parameter changes and reload feeds
   $effect(() => {
+    // Skip until initialized to prevent running on mount
+    if (!isInitialized) return;
+
     const subscriptionId = $page.url.searchParams.get("subscription_id");
 
     // Only reload if subscription_id has actually changed
@@ -197,46 +202,37 @@
   $effect(() => {
     // Watch these reactive values
     const trigger = scrollTrigger;
-    const hasMore = feedHasMore;
-    const cursor = feedNextCursor;
-    const loading = isLoading;
 
-    if (!trigger || !hasMore || !cursor) {
-      console.log("Skipping observer setup", {
-        trigger: !!trigger,
-        hasMore,
-        cursor,
-      });
+    if (!trigger) {
       return;
     }
 
-    console.log("Setting up IntersectionObserver", {
-      hasMore,
-      cursor,
-      loading,
-    });
+    console.log("Setting up IntersectionObserver");
 
     // Create intersection observer for infinite scroll
+    // Use callback that reads latest state values instead of capturing them
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
-          console.log("Intersection event:", {
-            isIntersecting: entry.isIntersecting,
-            feedHasMore,
-            isLoading,
-            feedNextCursor,
-          });
+        const entry = entries[0];
+        if (!entry) return;
 
-          if (
-            entry.isIntersecting &&
-            feedHasMore &&
-            !isLoading &&
-            feedNextCursor
-          ) {
-            console.log("Triggering load more feeds");
-            loadMoreFeeds();
-          }
+        console.log("Intersection event:", {
+          isIntersecting: entry.isIntersecting,
+          feedHasMore,
+          isLoading,
+          feedNextCursor,
         });
+
+        // Read current state values directly (not captured in closure)
+        if (
+          entry.isIntersecting &&
+          feedHasMore &&
+          !isLoading &&
+          feedNextCursor
+        ) {
+          console.log("Triggering load more feeds");
+          loadMoreFeeds();
+        }
       },
       {
         root: null, // viewport
@@ -418,14 +414,46 @@
 
     <div class="space-y-4">
       {#if isLoading && feeds.length === 0}
-        <!-- Initial Loading State -->
-        <div class="border border-[#FFD4B3] rounded-lg p-12 text-center">
-          <div class="flex flex-col items-center gap-3">
-            <div
-              class="animate-spin rounded-full h-8 w-8 border-b-2 border-[#FF6600]"
-            ></div>
-            <p class="text-gray-600 text-sm">Loading your feeds...</p>
-          </div>
+        <!-- Initial Loading State - Skeleton Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {#each Array(6) as _, i}
+            <div class="rounded-lg overflow-hidden bg-white shadow-sm">
+              <!-- Skeleton Image -->
+              <div
+                class="w-full h-48 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%]"
+              ></div>
+
+              <!-- Skeleton Content -->
+              <div class="p-3 space-y-3">
+                <!-- Skeleton Title -->
+                <div class="space-y-2">
+                  <div
+                    class="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded"
+                  ></div>
+                  <div
+                    class="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded w-3/4"
+                  ></div>
+                </div>
+
+                <!-- Skeleton Meta -->
+                <div class="space-y-2">
+                  <div
+                    class="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded w-1/2"
+                  ></div>
+                  <div
+                    class="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded w-1/3"
+                  ></div>
+                </div>
+
+                <!-- Skeleton Button -->
+                <div class="pt-2 border-t border-gray-100">
+                  <div
+                    class="h-7 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded w-24"
+                  ></div>
+                </div>
+              </div>
+            </div>
+          {/each}
         </div>
       {:else if feeds.length === 0}
         <!-- No Feeds State -->
@@ -584,7 +612,20 @@
     }
   }
 
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
   :global(.animate-slide-in) {
     animation: slide-in 0.3s ease-out;
+  }
+
+  :global(.animate-shimmer) {
+    animation: shimmer 2s infinite linear;
   }
 </style>

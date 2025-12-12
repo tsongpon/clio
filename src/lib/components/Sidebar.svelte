@@ -64,12 +64,12 @@
 
 <!-- Sidebar -->
 <aside
-  class="fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 flex flex-col transition-transform duration-300 z-40 {isMobileMenuOpen
+  class="fixed left-0 top-0 h-full w-60 bg-white flex flex-col transition-transform duration-300 z-40 overflow-y-auto {isMobileMenuOpen
     ? 'translate-x-0'
     : '-translate-x-full lg:translate-x-0'}"
 >
   <!-- Logo/Brand Section -->
-  <div class="px-4 py-3 border-b-2 border-[#FF6600]">
+  <div class="px-6 py-6 flex items-center justify-center">
     <button
       onclick={() => {
         if ($page.url.pathname === "/") {
@@ -78,100 +78,99 @@
           goto("/");
         }
       }}
-      class="flex items-center w-full hover:opacity-80 transition-opacity"
+      class="flex items-center hover:opacity-80 transition-opacity"
       aria-label="Reload feed"
     >
-      <img src={logo} alt="feedit.live" class="h-8" />
+      <img src={logo} alt="feedit.live" class="h-10" />
     </button>
   </div>
 
   <!-- Navigation Links -->
-  <nav class="flex-1 p-4 overflow-y-auto">
-    <ul class="space-y-1">
+  <nav class="flex-1 px-3">
+    <ul class="space-y-0.5">
       {#each navItems as item}
         {@const Icon = item.icon}
         <li>
           <button
             onclick={() => navigateTo(item.path)}
-            class="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors {isActive(
+            class="w-full flex items-center gap-6 px-3 py-2.5 rounded-lg transition-colors text-sm {isActive(
               item.path,
             )
-              ? 'bg-[#FF6600] text-white font-semibold'
-              : 'text-gray-700 hover:bg-[#FFE6D5]'}"
+              ? 'bg-gray-100 font-medium'
+              : 'hover:bg-gray-100'}"
           >
-            <Icon class="h-5 w-5" />
+            <Icon class="h-5 w-5 flex-shrink-0" />
             <span>{item.label}</span>
           </button>
         </li>
       {/each}
     </ul>
 
+    <!-- Divider -->
+    <div class="border-b border-gray-200 my-3"></div>
+
     <!-- Subscriptions Section -->
-    {#if $subscriptionsStore.length > 0}
-      <div class="mt-6">
-        <h3
-          class="px-4 text-xs font-bold text-[#FF6600] uppercase tracking-wider mb-2"
-        >
-          Subscriptions
-        </h3>
-        <ul class="space-y-1">
+    <div>
+      <h3 class="px-3 py-2 text-sm font-medium text-gray-700">Subscriptions</h3>
+      {#if $subscriptionsStore.length > 0}
+        <ul class="space-y-0.5">
           {#each $subscriptionsStore as subscription}
             <li>
               <button
                 onclick={() => navigateToSubscriptionFeed(subscription.id)}
-                class="w-full flex items-center gap-2 px-4 py-2 rounded-lg transition-colors {isSubscriptionActive(
+                class="w-full flex items-center gap-4 px-3 py-2 rounded-lg transition-colors text-sm {isSubscriptionActive(
                   subscription.id,
                 )
-                  ? 'bg-[#FF6600] text-white font-semibold'
-                  : 'text-gray-700 hover:bg-[#FFE6D5]'}"
+                  ? 'bg-gray-100 font-medium'
+                  : 'hover:bg-gray-100'}"
                 title={subscription.title}
               >
-                <Rss class="h-3 w-3 flex-shrink-0" />
-                <span class="truncate text-xs">{subscription.title}</span>
+                <div
+                  class="w-6 h-6 bg-[#FF6600] rounded-full flex items-center justify-center flex-shrink-0"
+                >
+                  <Rss class="h-3 w-3 text-white" />
+                </div>
+                <span class="truncate text-sm">{subscription.title}</span>
               </button>
             </li>
           {/each}
         </ul>
-      </div>
-    {/if}
+      {:else}
+        <p class="px-3 py-2 text-xs text-gray-500">No subscriptions yet</p>
+      {/if}
+    </div>
   </nav>
 
   <!-- User Profile Section -->
-  <div class="p-4 border-t-2 border-[#FF6600]">
+  <div class="border-t border-gray-200 p-3 mt-auto">
     {#if user}
-      <div class="mb-3 px-2">
-        <div class="flex items-center gap-3 mb-2">
-          <div
-            class="w-10 h-10 bg-[#FF6600] rounded-full flex items-center justify-center"
-          >
-            <User class="h-5 w-5 text-white" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold text-gray-900 truncate">
-              {user.name || "User"}
-            </p>
-            <p class="text-xs text-gray-500 truncate">{user.email || ""}</p>
-          </div>
-        </div>
-      </div>
-      <Button
+      <button
         onclick={handleLogout}
-        variant="ghost"
-        class="w-full justify-start gap-2 hover:bg-[#FFE6D5] hover:text-[#FF6600] font-medium"
+        class="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
       >
-        <LogOut class="h-4 w-4" />
-        Logout
-      </Button>
+        <div
+          class="w-8 h-8 bg-[#FF6600] rounded-full flex items-center justify-center flex-shrink-0"
+        >
+          <User class="h-4 w-4 text-white" />
+        </div>
+        <div class="flex-1 min-w-0 text-left">
+          <p class="text-sm font-medium text-gray-900 truncate">
+            {user.name || "User"}
+          </p>
+          <p class="text-xs text-gray-500 truncate">Logout</p>
+        </div>
+      </button>
     {/if}
   </div>
 </aside>
 
 <!-- Overlay for mobile -->
 {#if isMobileMenuOpen}
-  <button
-    class="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden cursor-default"
+  <div
+    class="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
     onclick={() => (isMobileMenuOpen = false)}
+    role="button"
     aria-label="Close menu"
     tabindex="-1"
-  ></button>
+  ></div>
 {/if}
