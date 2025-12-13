@@ -565,12 +565,23 @@
 
       <!-- Loading Indicator -->
       {#if isLoading && feeds.length > 0}
-        <div class="border border-[#FFD4B3] rounded-lg p-4 mt-4">
-          <div class="flex items-center justify-center gap-2">
-            <div
-              class="animate-spin rounded-full h-5 w-5 border-b-2 border-[#FF6600]"
-            ></div>
-            <span class="text-sm text-gray-600">Loading more feeds...</span>
+        <div class="flex items-center justify-center py-8 mt-4">
+          <div class="flex flex-col items-center gap-3">
+            <!-- Modern spinner with pulsing dots -->
+            <div class="flex gap-2">
+              <div
+                class="w-2 h-2 rounded-full bg-[#FF6600] animate-bounce [animation-delay:-0.3s]"
+              ></div>
+              <div
+                class="w-2 h-2 rounded-full bg-[#FF6600] animate-bounce [animation-delay:-0.15s]"
+              ></div>
+              <div
+                class="w-2 h-2 rounded-full bg-[#FF6600] animate-bounce"
+              ></div>
+            </div>
+            <span class="text-sm text-gray-500 font-medium"
+              >Loading more...</span
+            >
           </div>
         </div>
       {/if}
