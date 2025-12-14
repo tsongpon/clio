@@ -11,6 +11,15 @@
   let { isMobileMenuOpen = $bindable(false) } = $props();
 
   const user = $derived(getUser());
+  let showAllSubscriptions = $state(false);
+
+  const displayedSubscriptions = $derived(
+    showAllSubscriptions
+      ? $subscriptionsStore
+      : $subscriptionsStore.slice(0, 10),
+  );
+
+  const hasMoreSubscriptions = $derived($subscriptionsStore.length > 10);
 
   const navItems = [
     { path: "/", icon: Home, label: "Feed" },
@@ -114,7 +123,7 @@
       <h3 class="px-3 py-2 text-sm font-medium text-gray-700">Subscriptions</h3>
       {#if $subscriptionsStore.length > 0}
         <ul class="space-y-0.5">
-          {#each $subscriptionsStore as subscription}
+          {#each displayedSubscriptions as subscription}
             <li>
               <button
                 onclick={() => navigateToSubscriptionFeed(subscription.id)}
@@ -135,6 +144,16 @@
             </li>
           {/each}
         </ul>
+        {#if hasMoreSubscriptions}
+          <button
+            onclick={() => (showAllSubscriptions = !showAllSubscriptions)}
+            class="w-full px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors mt-1"
+          >
+            {showAllSubscriptions
+              ? "Show less"
+              : `Show more (${$subscriptionsStore.length - 10} more)`}
+          </button>
+        {/if}
       {:else}
         <p class="px-3 py-2 text-xs text-gray-500">No subscriptions yet</p>
       {/if}
