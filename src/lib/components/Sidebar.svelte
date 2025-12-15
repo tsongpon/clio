@@ -4,7 +4,10 @@
   import { Home, Rss, LogOut, User, Menu, X, Bookmark } from "lucide-svelte";
   import { getUser, removeToken } from "$lib/utils/auth";
   import Button from "./ui/button/Button.svelte";
-  import { subscriptionsStore } from "$lib/stores/subscriptions";
+  import {
+    subscriptionsStore,
+    subscriptionsLoadingStore,
+  } from "$lib/stores/subscriptions";
   import { onMount } from "svelte";
   import logo from "$lib/assets/logo.svg";
 
@@ -27,9 +30,10 @@
     { path: "/subscriptions", icon: Rss, label: "Subscriptions" },
   ];
 
-  onMount(() => {
-    subscriptionsStore.fetch();
-  });
+  // Don't load subscriptions on mount - let the main page trigger it after feeds load
+  // onMount(() => {
+  //   subscriptionsStore.fetch();
+  // });
 
   function handleLogout() {
     removeToken();
@@ -121,7 +125,23 @@
     <!-- Subscriptions Section -->
     <div>
       <h3 class="px-3 py-2 text-sm font-medium text-gray-700">Subscriptions</h3>
-      {#if $subscriptionsStore.length > 0}
+      {#if $subscriptionsLoadingStore}
+        <!-- Loading skeleton -->
+        <ul class="space-y-0.5">
+          {#each Array(5) as _, i}
+            <li>
+              <div class="w-full flex items-center gap-4 px-3 py-2">
+                <div
+                  class="w-6 h-6 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded-full flex-shrink-0"
+                ></div>
+                <div
+                  class="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded flex-1"
+                ></div>
+              </div>
+            </li>
+          {/each}
+        </ul>
+      {:else if $subscriptionsStore.length > 0}
         <ul class="space-y-0.5">
           {#each displayedSubscriptions as subscription}
             <li>
@@ -193,3 +213,18 @@
     tabindex="-1"
   ></div>
 {/if}
+
+<style>
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  :global(.animate-shimmer) {
+    animation: shimmer 2s infinite linear;
+  }
+</style>

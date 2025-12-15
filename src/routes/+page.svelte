@@ -17,6 +17,10 @@
   import { goto } from "$app/navigation";
   import { API_BASE_URL } from "$lib/config";
   import placeholderImage from "$lib/assets/feed-placeholder.svg";
+  import {
+    subscriptionsStore,
+    subscriptionsLoadingStore,
+  } from "$lib/stores/subscriptions";
 
   interface FeedItem {
     id: string;
@@ -166,6 +170,12 @@
       // Update cursor and hasMore state
       feedNextCursor = data.next_cursor;
       feedHasMore = data.has_more;
+
+      // Load subscriptions after initial feed load completes
+      if (!append && !cursor) {
+        await subscriptionsStore.fetch();
+        subscriptionsLoadingStore.setLoading(false);
+      }
 
       // Check if page is scrollable after initial load
       if (!append) {
