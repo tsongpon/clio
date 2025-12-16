@@ -113,6 +113,7 @@
   }
 
   async function addBookmark(): Promise<void> {
+    // Prevent duplicate submissions
     if (!newBookmarkUrl.trim() || isAddingBookmark) return;
 
     let formattedUrl = newBookmarkUrl.trim();
@@ -123,6 +124,7 @@
       formattedUrl = "https://" + formattedUrl;
     }
 
+    // Set loading state immediately to prevent double-clicks
     isAddingBookmark = true;
 
     try {

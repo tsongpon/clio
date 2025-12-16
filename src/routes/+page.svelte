@@ -50,6 +50,7 @@
     type: "success" | "error";
   } | null>(null);
   let notificationTimeout: number | null = null;
+  let bookmarkingFeedIds = $state<Set<string>>(new Set());
 
   // Get current subscription name for display
   const currentSubscriptionName = $derived.by(() => {
@@ -315,7 +316,14 @@
     }
   }
 
-  async function addBookmark(url: string): Promise<void> {
+  async function addBookmark(url: string, feedId: string): Promise<void> {
+    // Prevent duplicate submissions for the same feed
+    if (bookmarkingFeedIds.has(feedId)) return;
+
+    // Add feedId to the set to mark it as being bookmarked
+    // Create a new Set to trigger Svelte 5 reactivity
+    bookmarkingFeedIds = new Set(bookmarkingFeedIds).add(feedId);
+
     try {
       const response = await authenticatedFetch(`${API_BASE_URL}/bookmarks`, {
         method: "POST",
@@ -339,6 +347,12 @@
     } catch (error) {
       console.error("Failed to add bookmark:", error);
       showNotification("Failed to add bookmark", "error");
+    } finally {
+      // Remove feedId from the set to allow bookmarking again if needed
+      // Create a new Set to trigger Svelte 5 reactivity
+      const newSet = new Set(bookmarkingFeedIds);
+      newSet.delete(feedId);
+      bookmarkingFeedIds = newSet;
     }
   }
 
@@ -553,13 +567,14 @@
                     size="sm"
                     onclick={(e) => {
                       e.stopPropagation();
-                      addBookmark(feed.link);
+                      addBookmark(feed.link, feed.id);
                     }}
-                    class="text-gray-600 hover:text-[#FF6600] hover:bg-[#FFE6D5] h-7 px-2 text-xs"
+                    disabled={bookmarkingFeedIds.has(feed.id)}
+                    class="text-gray-600 hover:text-[#FF6600] hover:bg-[#FFE6D5] h-7 px-2 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                     aria-label="Bookmark this feed"
                   >
                     <Bookmark class="w-3 h-3 mr-1" />
-                    Bookmark
+                    {bookmarkingFeedIds.has(feed.id) ? "Saving..." : "Bookmark"}
                   </Button>
                 </div>
               </div>
