@@ -67,6 +67,10 @@ export async function authenticatedFetch(
 
     return response;
   } catch (error) {
+    // A request cancelled by the caller (AbortController) isn't a network
+    // failure; let the caller handle it.
+    if (options.signal?.aborted) throw error;
+
     // Handle network errors (e.g., ERR_NAME_NOT_RESOLVED, Failed to fetch)
     // Only redirect if we're not already on the error page to prevent infinite loops
     if (

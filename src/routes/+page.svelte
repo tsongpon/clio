@@ -1,13 +1,6 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import { Button } from "$lib/components/ui/button";
-  import { Card } from "$lib/components/ui/card";
-  import {
-    ExternalLink,
-    RefreshCw,
-    Bookmark,
-    AlertCircle,
-  } from "lucide-svelte";
+  import { RefreshCw, Bookmark, AlertCircle } from "lucide-svelte";
   import {
     authenticatedFetch,
     isAuthenticated,
@@ -16,11 +9,24 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { API_BASE_URL } from "$lib/config";
-  import placeholderImage from "$lib/assets/feed-placeholder.svg";
+  import searchIcon from "$lib/assets/search-icon.svg";
+  import externalReadingCue from "$lib/assets/external-reading-cue.svg";
+  import StoryCard from "$lib/components/StoryCard.svelte";
+  import BookmarkButton from "$lib/components/BookmarkButton.svelte";
+  import { invalidateUnreadCounts } from "$lib/stores/unreadCounts";
+  import { bookmarksStore } from "$lib/stores/bookmarks";
+  import {
+    buildSourceTitles,
+    formatStoryDate,
+    sourceLabel,
+    stripHtml,
+    urlKey,
+  } from "$lib/utils/story";
   import {
     subscriptionsStore,
     subscriptionsLoadingStore,
   } from "$lib/stores/subscriptions";
+  import { feedStatsStore } from "$lib/stores/feedStats";
 
   interface FeedItem {
     id: string;
@@ -44,21 +50,63 @@
   let feedHasMore = $state<boolean>(true);
   let pageSize = $state<number>(30);
   let isLoading = $state<boolean>(false);
-  let isReloadingFeed = $state<boolean>(false);
   let notification = $state<{
     message: string;
     type: "success" | "error";
   } | null>(null);
   let notificationTimeout: number | null = null;
-  let bookmarkingFeedIds = $state<Set<string>>(new Set());
+  const bookmarksByUrl = bookmarksStore.byUrl;
+  const pendingBookmarks = bookmarksStore.pending;
 
-  // Get current subscription name for display
-  const currentSubscriptionName = $derived.by(() => {
+  // Feed view state (client-side search / sorting)
+  let searchQuery = $state<string>("");
+  let sortMode = $state<"newest" | "oldest">("newest");
+  let isMarkingAllRead = $state<boolean>(false);
+
+  const unreadCount = $derived(feeds.filter((feed) => !feed.is_read).length);
+
+  const displayedFeeds = $derived.by(() => {
+    let items = feeds;
+
+    const query = searchQuery.trim().toLowerCase();
+    if (query) {
+      items = items.filter(
+        (feed) =>
+          (feed.title || "").toLowerCase().includes(query) ||
+          (feed.description || "").toLowerCase().includes(query),
+      );
+    }
+
+    return [...items].sort((a, b) => {
+      const aTime = new Date(a.published_at).getTime();
+      const bTime = new Date(b.published_at).getTime();
+      return sortMode === "newest" ? bTime - aTime : aTime - bTime;
+    });
+  });
+
+  // The subscription currently filtering the feed (via ?subscription_id=)
+  const activeSubscription = $derived.by(() => {
     const subscriptionId = $page.url.searchParams.get("subscription_id");
     if (!subscriptionId) return null;
-    // We don't have access to subscriptions here, so we'll just show it's filtered
-    return "Filtered Feed";
+    return $subscriptionsStore.find((s) => s.id === subscriptionId) ?? null;
   });
+
+  const sourceTitles = $derived(buildSourceTitles($subscriptionsStore));
+
+  function feedSource(feed: FeedItem): string {
+    if (activeSubscription) return activeSubscription.title;
+    return sourceLabel(feed.link, sourceTitles);
+  }
+
+  const collectionDate = $derived(
+    new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    })
+      .format(new Date())
+      .toUpperCase(),
+  );
 
   function handleAuthError(): void {
     // Clear invalid token
@@ -67,11 +115,15 @@
     goto("/login");
   }
 
-  async function openFeedLink(feedId: string, url: string): Promise<void> {
-    // Open the link first for immediate user feedback
-    window.open(url, "_blank", "noopener,noreferrer");
+  function updateFeedStats(): void {
+    feedStatsStore.set({
+      total: feeds.length,
+      unread: feeds.filter((feed) => !feed.is_read).length,
+    });
+  }
 
-    // Mark as read in the background
+  // Articles open via anchor links; mark them read in the background.
+  async function markFeedRead(feedId: string): Promise<void> {
     const success = await markAsRead(feedId);
 
     if (success) {
@@ -79,6 +131,7 @@
       feeds = feeds.map((feed) =>
         feed.id === feedId ? { ...feed, is_read: true } : feed,
       );
+      updateFeedStats();
     }
   }
 
@@ -98,6 +151,9 @@
     previousSubscriptionId = subscriptionId;
     isInitialized = true;
     fetchFeeds(null, false, true);
+    // Bookmarks drive each card's "Saved" state and the sidebar count; load
+    // them alongside the feed rather than after it.
+    bookmarksStore.ensureLoaded();
   });
 
   // Watch for URL parameter changes and reload feeds
@@ -154,13 +210,6 @@
 
       const data: FeedResponse = await response.json();
 
-      console.log("fetchFeeds response:", {
-        itemsCount: data.data.length,
-        nextCursor: data.next_cursor,
-        hasMore: data.has_more,
-        append,
-      });
-
       // Update feeds array
       if (append) {
         feeds = [...feeds, ...data.data];
@@ -172,24 +221,12 @@
       feedNextCursor = data.next_cursor;
       feedHasMore = data.has_more;
 
+      updateFeedStats();
+
       // Load subscriptions after initial feed load completes
       if (!append && !cursor) {
         await subscriptionsStore.fetch();
         subscriptionsLoadingStore.setLoading(false);
-      }
-
-      // Check if page is scrollable after initial load
-      if (!append) {
-        setTimeout(() => {
-          const isScrollable =
-            document.documentElement.scrollHeight > window.innerHeight;
-          console.log("Page scrollability check:", {
-            scrollHeight: document.documentElement.scrollHeight,
-            windowHeight: window.innerHeight,
-            isScrollable,
-            feedCount: feeds.length,
-          });
-        }, 100);
       }
     } catch (error) {
       console.error("Failed to fetch feeds:", error);
@@ -199,11 +236,6 @@
   }
 
   function loadMoreFeeds(): void {
-    console.log("loadMoreFeeds called:", {
-      feedHasMore,
-      isLoading,
-      feedNextCursor,
-    });
     if (feedHasMore && !isLoading && feedNextCursor) {
       fetchFeeds(feedNextCursor, true, false);
     }
@@ -218,21 +250,12 @@
       return;
     }
 
-    console.log("Setting up IntersectionObserver");
-
     // Create intersection observer for infinite scroll
     // Use callback that reads latest state values instead of capturing them
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
         if (!entry) return;
-
-        console.log("Intersection event:", {
-          isIntersecting: entry.isIntersecting,
-          feedHasMore,
-          isLoading,
-          feedNextCursor,
-        });
 
         // Read current state values directly (not captured in closure)
         if (
@@ -241,7 +264,6 @@
           !isLoading &&
           feedNextCursor
         ) {
-          console.log("Triggering load more feeds");
           loadMoreFeeds();
         }
       },
@@ -256,103 +278,25 @@
 
     // Cleanup
     return () => {
-      console.log("Cleaning up IntersectionObserver");
       observer.disconnect();
     };
   });
 
-  function formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    // Less than 1 minute
-    if (diffMins < 1) return "just now";
-
-    // Less than 1 hour
-    if (diffMins < 60)
-      return `${diffMins} ${diffMins === 1 ? "minute" : "minutes"} ago`;
-
-    // Less than 24 hours
-    if (diffHours < 24)
-      return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
-
-    // Less than 7 days
-    if (diffDays < 7)
-      return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`;
-
-    // More than 7 days - show formatted date
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(date);
-  }
-
-  function extractDomain(url: string): string {
-    try {
-      const urlObject = new URL(url);
-      return urlObject.hostname;
-    } catch {
-      return url;
-    }
-  }
-
-  async function reloadFeed(): Promise<void> {
-    if (isReloadingFeed) return;
-
-    isReloadingFeed = true;
-    feeds = [];
-    feedNextCursor = null;
-    feedHasMore = true;
-
-    try {
-      await fetchFeeds(null, false, true);
-    } finally {
-      isReloadingFeed = false;
-    }
-  }
-
-  async function addBookmark(url: string, feedId: string): Promise<void> {
-    // Prevent duplicate submissions for the same feed
-    if (bookmarkingFeedIds.has(feedId)) return;
-
-    // Add feedId to the set to mark it as being bookmarked
-    // Create a new Set to trigger Svelte 5 reactivity
-    bookmarkingFeedIds = new Set(bookmarkingFeedIds).add(feedId);
-
-    try {
-      const response = await authenticatedFetch(`${API_BASE_URL}/bookmarks`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url }),
-      });
-
-      if (response.status === 401) {
-        handleAuthError();
-        return;
-      }
-
-      if (!response.ok) {
-        showNotification(`Failed to add bookmark: ${response.status}`, "error");
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      showNotification("Bookmark added successfully!", "success");
-    } catch (error) {
-      console.error("Failed to add bookmark:", error);
-      showNotification("Failed to add bookmark", "error");
-    } finally {
-      // Remove feedId from the set to allow bookmarking again if needed
-      // Create a new Set to trigger Svelte 5 reactivity
-      const newSet = new Set(bookmarkingFeedIds);
-      newSet.delete(feedId);
-      bookmarkingFeedIds = newSet;
+  // Bookmark toggle: "Bookmark" saves the story, "Saved" removes it again.
+  async function toggleBookmark(feed: FeedItem): Promise<void> {
+    const existing = $bookmarksByUrl.get(urlKey(feed.link));
+    if (existing) {
+      const ok = await bookmarksStore.remove(existing);
+      showNotification(
+        ok ? "Removed from bookmarks." : "Couldn't remove the bookmark.",
+        ok ? "success" : "error",
+      );
+    } else {
+      const ok = await bookmarksStore.add(feed.link);
+      showNotification(
+        ok ? "Saved to bookmarks." : "Couldn't save the bookmark.",
+        ok ? "success" : "error",
+      );
     }
   }
 
@@ -376,10 +320,50 @@
         return false;
       }
 
+      invalidateUnreadCounts();
       return true;
     } catch (error) {
       console.error("Failed to mark as read:", error);
       return false;
+    }
+  }
+
+  // Bulk mark-read for the loaded stories (one request per unread story).
+  async function markAllAsRead(): Promise<void> {
+    const unreadFeeds = feeds.filter((feed) => !feed.is_read);
+    if (unreadFeeds.length === 0 || isMarkingAllRead) return;
+
+    isMarkingAllRead = true;
+
+    try {
+      const results = await Promise.allSettled(
+        unreadFeeds.map((feed) => markAsRead(feed.id)),
+      );
+
+      const readIds = new Set<string>();
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled" && result.value) {
+          readIds.add(unreadFeeds[index].id);
+        }
+      });
+
+      if (readIds.size > 0) {
+        feeds = feeds.map((feed) =>
+          readIds.has(feed.id) ? { ...feed, is_read: true } : feed,
+        );
+        updateFeedStats();
+      }
+
+      if (readIds.size === unreadFeeds.length) {
+        showNotification("All stories marked as read.", "success");
+      } else {
+        showNotification(
+          `Marked ${readIds.size} of ${unreadFeeds.length} stories as read.`,
+          readIds.size > 0 ? "success" : "error",
+        );
+      }
+    } finally {
+      isMarkingAllRead = false;
     }
   }
 
@@ -398,237 +382,196 @@
       notificationTimeout = null;
     }, 3000);
   }
-
-  function getProxiedImageUrl(imageUrl: string): string {
-    if (!imageUrl) return placeholderImage;
-    // Proxy external images through our backend to avoid CORS issues
-    return `${API_BASE_URL}/proxy/image?url=${encodeURIComponent(imageUrl)}`;
-  }
 </script>
 
-<div class="min-h-screen bg-white p-4 lg:p-6">
+<div class="min-h-full px-6 pt-[34px] pb-16 lg:px-10">
   <!-- Notification Toast -->
   {#if notification}
     <div
-      class={`fixed top-4 right-4 px-4 py-2 rounded-md shadow-md z-50 flex items-center gap-2 animate-slide-in ${
+      class={`animate-slide-in fixed top-4 right-4 z-50 flex items-center gap-2 rounded-[7px] px-4 py-2 shadow-md ${
         notification.type === "success"
-          ? "bg-[#FF6600] text-white"
+          ? "bg-[#315d43] text-white"
           : "bg-red-500 text-white"
       }`}
     >
       {#if notification.type === "success"}
-        <Bookmark class="w-4 h-4" />
+        <Bookmark class="h-4 w-4" />
       {:else}
-        <AlertCircle class="w-4 h-4" />
+        <AlertCircle class="h-4 w-4" />
       {/if}
       <span class="text-sm">{notification.message}</span>
     </div>
   {/if}
-  <div class="mx-auto max-w-7xl">
+
+  <div class="mx-auto w-full max-w-[1312px]">
     <!-- Page Header -->
-    <div class="mb-4">
-      <h1 class="text-2xl font-semibold text-gray-900">
-        {#if $page.url.searchParams.get("subscription_id")}
-          Filtered Feed
-        {:else}
-          All Feed
-        {/if}
-      </h1>
+    <div
+      class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between"
+    >
+      <div>
+        <p class="text-[10px] font-semibold tracking-[1.2px] text-[#63715f]">
+          {collectionDate}
+        </p>
+        <h1
+          class="mt-[13px] font-serif text-[34px] leading-[1.3] text-[#17362b]"
+        >
+          {activeSubscription
+            ? activeSubscription.title
+            : "Your daily collection"}
+        </h1>
+        <p class="mt-[10px] text-[13px] leading-[1.5] text-[#63715f]">
+          The latest stories from your subscriptions.
+        </p>
+      </div>
+
+      <div class="flex w-full flex-col lg:mt-[25px] lg:w-[472px] lg:shrink-0">
+        <div class="relative">
+          <img
+            src={searchIcon}
+            alt=""
+            class="pointer-events-none absolute top-1/2 left-[15px] h-[18px] w-[18px] -translate-y-1/2"
+          />
+          <input
+            type="search"
+            bind:value={searchQuery}
+            placeholder="Search your articles"
+            aria-label="Search your articles"
+            class="h-[46px] w-full rounded-[8px] border border-[#dce1d5] bg-[#f2f4ec] pr-4 pl-[46px] text-[13px] text-[#17362b] transition-colors placeholder:text-[#63715f] focus:border-[#315d43] focus:bg-white focus:outline-none"
+          />
+        </div>
+        <div class="mt-[14px] flex justify-end">
+          <button
+            type="button"
+            onclick={markAllAsRead}
+            disabled={isMarkingAllRead || unreadCount === 0}
+            class="text-[11px] font-medium text-[#315d43] transition-opacity hover:underline disabled:opacity-50 disabled:hover:no-underline"
+            title="Mark all loaded stories as read"
+          >
+            {isMarkingAllRead ? "Marking..." : "Mark all as read"}
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div class="space-y-4">
+    <!-- Section heading + sorting -->
+    <div class="mt-[35px] flex items-center justify-between gap-4">
+      <h2 class="text-[16px] leading-[1.5] font-medium text-[#17362b]">
+        Latest stories
+      </h2>
+      <button
+        type="button"
+        onclick={() => (sortMode = sortMode === "newest" ? "oldest" : "newest")}
+        class="text-[11px] text-[#63715f] transition-colors hover:text-[#315d43]"
+        title="Toggle sort order"
+      >
+        {sortMode === "newest" ? "Newest first ↓" : "Oldest first ↑"}
+      </button>
+    </div>
+
+    <!-- Helper row -->
+    <div class="mt-[21px] flex items-center gap-[9px]">
+      <img src={externalReadingCue} alt="" class="h-3.5 w-3.5 shrink-0" />
+      <p class="text-[11px] leading-[1.5] text-[#63715f]">
+        Select a story to read the full article in a new tab.
+      </p>
+    </div>
+
+    <div class="mt-[21px]">
       {#if isLoading && feeds.length === 0}
         <!-- Initial Loading State - Skeleton Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {#each Array(6) as _, i}
-            <div class="rounded-lg overflow-hidden bg-white shadow-sm">
-              <!-- Skeleton Image -->
+        <div
+          class="grid grid-cols-1 gap-x-6 gap-y-9 md:grid-cols-2 xl:grid-cols-3"
+        >
+          {#each Array(6) as _, i (i)}
+            <div class="flex flex-col">
               <div
-                class="w-full h-48 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%]"
+                class="animate-shimmer aspect-[408/230] rounded-[10px] bg-gradient-to-r from-[#eef1e6] via-[#f6f7f1] to-[#eef1e6] bg-[length:200%_100%]"
               ></div>
-
-              <!-- Skeleton Content -->
-              <div class="p-3 space-y-3">
-                <!-- Skeleton Title -->
-                <div class="space-y-2">
-                  <div
-                    class="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded"
-                  ></div>
-                  <div
-                    class="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded w-3/4"
-                  ></div>
-                </div>
-
-                <!-- Skeleton Meta -->
-                <div class="space-y-2">
-                  <div
-                    class="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded w-1/2"
-                  ></div>
-                  <div
-                    class="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded w-1/3"
-                  ></div>
-                </div>
-
-                <!-- Skeleton Button -->
-                <div class="pt-2 border-t border-gray-100">
-                  <div
-                    class="h-7 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded w-24"
-                  ></div>
-                </div>
+              <div class="mt-4 space-y-3">
+                <div
+                  class="animate-shimmer h-4 w-3/4 rounded bg-gradient-to-r from-[#dce6d3] via-[#e8ecdf] to-[#dce6d3] bg-[length:200%_100%]"
+                ></div>
+                <div
+                  class="animate-shimmer h-3 w-1/2 rounded bg-gradient-to-r from-[#dce6d3] via-[#e8ecdf] to-[#dce6d3] bg-[length:200%_100%]"
+                ></div>
+                <div
+                  class="animate-shimmer h-3 w-1/3 rounded bg-gradient-to-r from-[#dce6d3] via-[#e8ecdf] to-[#dce6d3] bg-[length:200%_100%]"
+                ></div>
               </div>
             </div>
           {/each}
         </div>
       {:else if feeds.length === 0}
         <!-- No Feeds State -->
-        <div class="border border-[#FFD4B3] rounded-lg p-8 text-center">
+        <div class="rounded-[14px] border border-[#dce1d5] p-8 text-center">
           <div
-            class="bg-[#FFE6D5] w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2"
+            class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#dce6d3]"
           >
-            <RefreshCw class="w-5 h-5 text-[#FF6600]" />
+            <RefreshCw class="h-5 w-5 text-[#315d43]" />
           </div>
-          <p class="text-gray-600 text-sm">No feeds yet</p>
-          <p class="text-gray-400 text-xs mt-1">
+          <p class="text-sm text-[#41553e]">No feeds yet</p>
+          <p class="mt-1 text-xs text-[#63715f]">
             Check back later for updates!
           </p>
         </div>
+      {:else if displayedFeeds.length === 0}
+        <!-- No search results -->
+        <p class="py-16 text-center text-sm text-[#63715f]">
+          No stories match your search.
+        </p>
       {:else}
-        <!-- Feed Card Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {#each feeds as feed (feed.id)}
-            <div
-              class="rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col bg-white"
-              style={feed.is_read ? "opacity: 0.6;" : ""}
+        <!-- Story card grid -->
+        <div
+          class="grid grid-cols-1 gap-x-6 gap-y-9 md:grid-cols-2 xl:grid-cols-3"
+        >
+          {#each displayedFeeds as feed (feed.id)}
+            <StoryCard
+              href={feed.link}
+              title={feed.title}
+              imageUrl={feed.main_image_url}
+              source={feedSource(feed)}
+              description={stripHtml(feed.description)}
+              meta={formatStoryDate(feed.published_at)}
+              isRead={feed.is_read}
+              onOpen={() => markFeedRead(feed.id)}
             >
-              <!-- Main Image on Top -->
-              <div
-                class="w-full h-48 overflow-hidden cursor-pointer relative"
-                onclick={() => openFeedLink(feed.id, feed.link)}
-                role="button"
-                tabindex="0"
-                onkeydown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    openFeedLink(feed.id, feed.link);
-                  }
-                }}
-              >
-                <img
-                  src={getProxiedImageUrl(feed.main_image_url)}
-                  alt={feed.title || "Feed image"}
-                  class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                  onerror={(e) => {
-                    const target = e.currentTarget as HTMLImageElement;
-                    target.src = placeholderImage;
-                  }}
+              {#snippet action()}
+                <BookmarkButton
+                  variant={$bookmarksByUrl.has(urlKey(feed.link))
+                    ? "saved"
+                    : "save"}
+                  busy={$pendingBookmarks.has(urlKey(feed.link))}
+                  onclick={() => toggleBookmark(feed)}
                 />
-                {#if feed.is_read}
-                  <div
-                    class="absolute top-2 right-2 bg-[#FF6600] text-white text-xs font-medium px-2 py-1 rounded"
-                  >
-                    READ
-                  </div>
-                {/if}
-              </div>
-
-              <!-- Card Content -->
-              <div class="p-3 flex-1 flex flex-col">
-                <!-- Title -->
-                <h3
-                  class="text-base font-medium text-gray-900 mb-2 line-clamp-2 cursor-pointer hover:text-gray-600 transition-colors"
-                  onclick={() => openFeedLink(feed.id, feed.link)}
-                  role="button"
-                  tabindex="0"
-                  onkeydown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      openFeedLink(feed.id, feed.link);
-                    }
-                  }}
-                >
-                  {feed.title || "Untitled Feed"}
-                </h3>
-
-                <!-- Date and Source -->
-                <div class="text-xs text-gray-500 mb-2 space-y-1">
-                  <p class="flex items-center gap-1">
-                    <ExternalLink class="w-3 h-3 flex-shrink-0" />
-                    {extractDomain(feed.link)}
-                  </p>
-                  <p>{formatDate(feed.published_at)}</p>
-                </div>
-
-                <!-- Actions -->
-                <div
-                  class="pt-2 mt-auto border-t border-orange-50 flex justify-end"
-                >
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      addBookmark(feed.link, feed.id);
-                    }}
-                    disabled={bookmarkingFeedIds.has(feed.id)}
-                    class="text-gray-600 hover:text-[#FF6600] hover:bg-[#FFE6D5] h-7 px-2 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label="Bookmark this feed"
-                  >
-                    <Bookmark class="w-3 h-3 mr-1" />
-                    {bookmarkingFeedIds.has(feed.id) ? "Saving..." : "Bookmark"}
-                  </Button>
-                </div>
-              </div>
-            </div>
+              {/snippet}
+            </StoryCard>
           {/each}
         </div>
       {/if}
 
       <!-- Infinite Scroll Trigger -->
       {#if feedHasMore && feeds.length > 0 && feedNextCursor}
-        <div bind:this={scrollTrigger} class="w-full h-4"></div>
+        <div bind:this={scrollTrigger} class="h-4 w-full"></div>
       {/if}
 
       <!-- Loading Indicator -->
       {#if isLoading && feeds.length > 0}
-        <div class="flex items-center justify-center py-8 mt-4">
+        <div class="mt-4 flex items-center justify-center py-8">
           <div class="flex flex-col items-center gap-3">
-            <!-- Modern spinner with pulsing dots -->
             <div class="flex gap-2">
               <div
-                class="w-2 h-2 rounded-full bg-[#FF6600] animate-bounce [animation-delay:-0.3s]"
+                class="h-2 w-2 animate-bounce rounded-full bg-[#315d43] [animation-delay:-0.3s]"
               ></div>
               <div
-                class="w-2 h-2 rounded-full bg-[#FF6600] animate-bounce [animation-delay:-0.15s]"
+                class="h-2 w-2 animate-bounce rounded-full bg-[#315d43] [animation-delay:-0.15s]"
               ></div>
               <div
-                class="w-2 h-2 rounded-full bg-[#FF6600] animate-bounce"
+                class="h-2 w-2 animate-bounce rounded-full bg-[#315d43]"
               ></div>
             </div>
-            <span class="text-sm text-gray-500 font-medium"
+            <span class="text-sm font-medium text-[#63715f]"
               >Loading more...</span
             >
-          </div>
-        </div>
-      {/if}
-
-      <!-- End of List Indicator -->
-      {#if !feedHasMore && feeds.length > 0}
-        <div class="border border-[#FFD4B3] rounded-lg p-4 mt-4">
-          <div class="flex flex-col items-center gap-2">
-            <p class="text-center text-sm text-gray-500">
-              You've reached the end of your feeds
-            </p>
-            <Button
-              onclick={reloadFeed}
-              disabled={isReloadingFeed}
-              class="h-8 px-3 bg-[#FF6600] hover:bg-[#FF8533] text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Reload feed"
-            >
-              <RefreshCw
-                class={`w-4 h-4 mr-1.5 ${isReloadingFeed ? "animate-spin" : ""}`}
-              />
-              {isReloadingFeed ? "Reloading..." : "Reload Feed"}
-            </Button>
           </div>
         </div>
       {/if}

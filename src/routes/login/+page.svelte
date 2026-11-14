@@ -1,15 +1,16 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Card } from "$lib/components/ui/card";
-  import { Lock, Mail, Bookmark, Rss } from "lucide-svelte";
   import { goto } from "$app/navigation";
   import { API_BASE_URL } from "$lib/config";
+  import rssMark from "$lib/assets/rss-mark.svg";
+  import showPasswordIcon from "$lib/assets/show-password.svg";
+  import continueArrow from "$lib/assets/continue-arrow.svg";
+  import AuthEditorialPanel from "$lib/components/AuthEditorialPanel.svelte";
 
   let email = $state<string>("");
   let password = $state<string>("");
   let errorMessage = $state<string>("");
   let isLoading = $state<boolean>(false);
+  let showPassword = $state<boolean>(false);
 
   async function handleLogin(): Promise<void> {
     if (!email.trim() || !password.trim()) {
@@ -68,237 +69,156 @@
       isLoading = false;
     }
   }
-
-  function handleKeyPress(event: KeyboardEvent): void {
-    if (event.key === "Enter") {
-      handleLogin();
-    }
-  }
 </script>
 
-<div class="min-h-screen bg-white flex">
-  <!-- Left Side - Product Description -->
+<div class="flex min-h-screen bg-[#fcfbf7]">
+  <AuthEditorialPanel headline={["Your world.", "Worth reading."]} />
+
+  <!-- Right · Authentication -->
   <div
-    class="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#FF6600] to-[#FF8533] p-12 flex-col justify-between relative overflow-hidden"
+    class="flex min-h-screen w-full flex-col px-8 pt-[58px] pb-[37px] lg:w-[55%] lg:px-16"
   >
-    <!-- Background Pattern -->
-    <div class="absolute inset-0 opacity-10">
-      <div
-        class="absolute top-20 left-20 w-64 h-64 bg-white rounded-full blur-3xl"
-      ></div>
-      <div
-        class="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl"
-      ></div>
-    </div>
-
-    <div class="relative z-10">
-      <!-- Logo/Brand -->
-      <div class="flex items-center gap-3 mb-16">
+    <!-- Mobile brand + account switch -->
+    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+      <div class="flex items-center gap-3 lg:hidden">
         <div
-          class="bg-white w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#dce9b9] p-1.5"
         >
-          <Rss class="w-6 h-6 text-[#FF6600]" />
+          <img src={rssMark} alt="feedit.live" class="h-6 w-6" />
         </div>
-        <div>
-          <h1 class="text-3xl font-bold text-white">feedit.live</h1>
-        </div>
+        <p class="text-2xl font-semibold text-[#17362b]">feedit.live</p>
       </div>
-
-      <!-- Hero Section -->
-      <div class="max-w-md">
-        <h2 class="text-4xl font-bold text-white mb-6 leading-tight">
-          Your Personal Content Hub
-        </h2>
-        <p class="text-white/90 text-lg mb-12 leading-relaxed">
-          Save, organize, and discover content that matters. Manage your
-          bookmarks and RSS feeds all in one beautiful place.
-        </p>
-
-        <!-- Features -->
-        <div class="space-y-6">
-          <div class="flex items-start gap-4">
-            <div
-              class="bg-white/20 backdrop-blur-sm w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-            >
-              <Rss class="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 class="text-white font-semibold text-lg mb-1">
-                RSS Feed Reader
-              </h3>
-              <p class="text-white/80 text-sm">
-                Subscribe to your favorite blogs and news sources. Get all your
-                updates in one unified feed.
-              </p>
-            </div>
-          </div>
-
-          <div class="flex items-start gap-4">
-            <div
-              class="bg-white/20 backdrop-blur-sm w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-            >
-              <Bookmark class="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 class="text-white font-semibold text-lg mb-1">
-                Smart Bookmarks
-              </h3>
-              <p class="text-white/80 text-sm">
-                Save and organize your favorite websites with one click. Never
-                lose track of important content.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Bottom Quote -->
-    <div class="relative z-10">
-      <p class="text-white/70 text-sm italic">
-        "The best way to stay informed and organized in the digital age."
+      <p class="ml-auto text-xs leading-[1.45]">
+        <span class="text-[#737c72]">New to feedit.live?</span>
+        <a
+          href="/signup"
+          class="ml-2 font-semibold text-[#315d43] hover:underline"
+        >
+          Create an account ↗
+        </a>
       </p>
     </div>
-  </div>
 
-  <!-- Right Side - Login Form -->
-  <div
-    class="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gradient-to-br from-[#FFF5EE] to-white"
-  >
-    <div class="w-full max-w-md">
-      <!-- Mobile Logo -->
-      <div class="lg:hidden flex items-center justify-center gap-3 mb-8">
-        <div
-          class="bg-[#FF6600] w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
-        >
-          <Rss class="w-6 h-6 text-white" />
+    <!-- Login form
+
+         Raw <input>/<button> elements are used here instead of the shared ui
+         components: their baked-in blue defaults override per-page classes due
+         to Tailwind v4 CSS ordering, so they cannot express this design
+         reliably without touching every page that uses them. -->
+    <div class="flex flex-1 items-center justify-center py-12">
+      <form
+        novalidate
+        class="flex w-full max-w-[430px] flex-col gap-[22px]"
+        onsubmit={(e) => {
+          e.preventDefault();
+          handleLogin();
+        }}
+      >
+        <div class="flex flex-col gap-[8px]">
+          <h1 class="text-[32px] leading-[1.45] font-semibold text-[#1d3528]">
+            Welcome back.
+          </h1>
+          <p class="text-sm leading-[1.45] text-[#737c72]">
+            Your favorite reads are right where you left them.
+          </p>
         </div>
-        <h1 class="text-2xl font-bold text-gray-900">feedit.live</h1>
-      </div>
 
-      <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold tracking-tight text-gray-900 mb-2">
-          Welcome Back
-        </h1>
-        <p class="text-gray-600">Sign in to access your content hub</p>
-      </div>
-
-      <Card class="bg-white rounded-xl shadow-xl p-8 border border-gray-100">
-        <form
-          onsubmit={(e) => {
-            e.preventDefault();
-            handleLogin();
-          }}
-          class="space-y-6"
-        >
-          <div>
+        <div class="flex flex-col gap-[18px]">
+          <div class="flex flex-col gap-[8px]">
             <label
               for="email"
-              class="block text-sm font-medium text-gray-700 mb-2"
+              class="text-xs leading-[1.45] font-medium text-[#34483a]"
             >
-              Email Address
+              Email address
             </label>
-            <div class="relative">
-              <div
-                class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
-              >
-                <Mail class="h-5 w-5 text-gray-400" />
-              </div>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                bind:value={email}
-                onkeypress={handleKeyPress}
-                disabled={isLoading}
-                class="pl-10 h-11 rounded-lg border-gray-200 focus:border-[#FF6600] focus:ring-[#FF6600]"
-                autocomplete="email"
-              />
-            </div>
+            <input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              bind:value={email}
+              disabled={isLoading}
+              autocomplete="email"
+              class="h-12 w-full rounded-[7px] border border-[#d9ded4] bg-white px-[15px] text-[13px] text-[#34483a] transition-colors placeholder:text-[#879084] focus:border-[#315d43] focus:ring-2 focus:ring-[#315d43]/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            />
           </div>
 
-          <div>
+          <div class="flex flex-col gap-[8px]">
             <label
               for="password"
-              class="block text-sm font-medium text-gray-700 mb-2"
+              class="text-xs leading-[1.45] font-medium text-[#34483a]"
             >
               Password
             </label>
             <div class="relative">
-              <div
-                class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
-              >
-                <Lock class="h-5 w-5 text-gray-400" />
-              </div>
-              <Input
+              <input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="Enter your password"
                 bind:value={password}
-                onkeypress={handleKeyPress}
                 disabled={isLoading}
-                class="pl-10 h-11 rounded-lg border-gray-200 focus:border-[#FF6600] focus:ring-[#FF6600]"
                 autocomplete="current-password"
+                class="h-12 w-full rounded-[7px] border border-[#d9ded4] bg-white px-[15px] pr-12 text-[13px] text-[#34483a] transition-colors placeholder:text-[#879084] focus:border-[#315d43] focus:ring-2 focus:ring-[#315d43]/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               />
+              <button
+                type="button"
+                onclick={() => (showPassword = !showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                class="absolute top-1/2 right-4 -translate-y-1/2 rounded p-0.5 focus:ring-2 focus:ring-[#315d43]/50 focus:outline-none"
+              >
+                <img src={showPasswordIcon} alt="" class="h-5 w-5" />
+              </button>
             </div>
           </div>
+        </div>
 
-          {#if errorMessage}
-            <div
-              class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm"
-              role="alert"
-            >
-              {errorMessage}
-            </div>
-          {/if}
-
-          <Button
-            type="submit"
-            onclick={handleLogin}
-            disabled={isLoading}
-            class="w-full h-11 bg-[#FF6600] hover:bg-[#FF8533] rounded-lg font-semibold text-base shadow-lg hover:shadow-xl transition-all"
+        <!-- Remember me is visual only for now — not yet wired to auth
+             (local vs session storage). Forgot password is out of scope. -->
+        <div class="flex items-center gap-2">
+          <input
+            id="remember"
+            type="checkbox"
+            class="h-4 w-4 rounded-[3px] accent-[#315d43]"
+          />
+          <label
+            for="remember"
+            class="flex-1 text-xs leading-[1.45] text-[#677461]"
           >
-            {isLoading ? "Signing in..." : "Sign In"}
-          </Button>
-        </form>
-
-        <div class="mt-6 text-center">
-          <p class="text-sm text-gray-600">
-            Don't have an account?
-            <a
-              href="/signup"
-              class="text-[#FF6600] hover:text-[#FF8533] font-medium ml-1"
-            >
-              Create one now
-            </a>
-          </p>
+            Remember me
+          </label>
         </div>
-      </Card>
 
-      <!-- Mobile Features Preview -->
-      <div class="lg:hidden mt-8 space-y-4">
-        <p class="text-center text-sm text-gray-500 font-medium">
-          Why choose feedit.live?
+        {#if errorMessage}
+          <div
+            class="rounded-[7px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            role="alert"
+          >
+            {errorMessage}
+          </div>
+        {/if}
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          class="flex h-[50px] w-full items-center justify-center gap-3 rounded-[7px] bg-[#315d43] text-sm font-semibold text-white transition-colors hover:bg-[#2a4d39] focus:ring-2 focus:ring-[#315d43]/50 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isLoading ? "Signing in..." : "Log in"}
+          {#if !isLoading}
+            <img src={continueArrow} alt="" class="h-5 w-5" />
+          {/if}
+        </button>
+
+        <p class="text-center text-[11px] leading-[1.45] text-[#7b8278]">
+          Pick up where your curiosity left off.
         </p>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="text-center">
-            <div
-              class="bg-[#FFE6D5] w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-2"
-            >
-              <Rss class="w-5 h-5 text-[#FF6600]" />
-            </div>
-            <p class="text-xs text-gray-600">RSS Feeds</p>
-          </div>
-          <div class="text-center">
-            <div
-              class="bg-[#FFE6D5] w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-2"
-            >
-              <Bookmark class="w-5 h-5 text-[#FF6600]" />
-            </div>
-            <p class="text-xs text-gray-600">Bookmarks</p>
-          </div>
-        </div>
-      </div>
+      </form>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex items-start gap-[22px] text-[11px] leading-[1.45]">
+      <p class="flex-1 text-[#7b8278]">© 2026 feedit.live</p>
+      <p class="text-[#737c72]">Privacy</p>
+      <p class="text-[#737c72]">Terms</p>
+      <p class="text-[#737c72]">Get help</p>
     </div>
   </div>
 </div>
