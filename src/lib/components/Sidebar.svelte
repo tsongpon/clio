@@ -119,7 +119,7 @@
   </p>
   <button
     onclick={() => navigateTo("/")}
-    class="-mx-2 mt-[15px] flex h-11 items-center gap-3 rounded-[7px] pr-2 pl-[15px] text-left transition-colors {isAllFeedsActive()
+    class="-mx-2 mt-[15px] flex h-11 w-[calc(100%+16px)] items-center gap-3 rounded-[7px] pr-2 pl-[15px] text-left transition-colors {isAllFeedsActive()
       ? 'bg-[#dce6d3]'
       : 'hover:bg-[#dce6d3]/60'}"
   >
@@ -176,7 +176,7 @@
           <li>
             <button
               onclick={() => navigateToSubscriptionFeed(subscription.id)}
-              class="-mx-2 flex items-center gap-[11px] rounded-[7px] px-[10px] py-[15px] text-left transition-colors {isSubscriptionActive(
+              class="-mx-2 flex w-[calc(100%+16px)] items-center gap-[11px] rounded-[7px] px-[10px] py-[15px] text-left transition-colors {isSubscriptionActive(
                 subscription.id,
               )
                 ? 'bg-[#dce6d3]'
@@ -229,7 +229,7 @@
          so this slot holds Bookmarks to keep the page reachable. -->
     <button
       onclick={() => navigateTo("/bookmarks")}
-      class="-mx-2 flex items-center gap-[11px] rounded-[7px] px-[10px] py-[15px] text-left transition-colors {isActive(
+      class="-mx-2 flex w-[calc(100%+16px)] items-center gap-[11px] rounded-[7px] px-[10px] py-[15px] text-left transition-colors {isActive(
         '/bookmarks',
       )
         ? 'bg-[#dce6d3]'
