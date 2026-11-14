@@ -1,15 +1,36 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import { Card } from "$lib/components/ui/card";
-  import { Lock, Mail, Bookmark, Rss } from "lucide-svelte";
   import { goto } from "$app/navigation";
   import { API_BASE_URL } from "$lib/config";
+  import rssMark from "$lib/assets/rss-mark.svg";
+  import quietReadingIndicator from "$lib/assets/quiet-reading-indicator.svg";
+  import showPasswordIcon from "$lib/assets/show-password.svg";
+  import continueArrow from "$lib/assets/continue-arrow.svg";
 
   let email = $state<string>("");
   let password = $state<string>("");
   let errorMessage = $state<string>("");
   let isLoading = $state<boolean>(false);
+  let showPassword = $state<boolean>(false);
+  let googleNotice = $state<string>("");
+
+  // Static editorial content for the left panel reading preview.
+  const previewArticles = [
+    {
+      topic: "DESIGN",
+      title: "Designing a slower internet",
+      source: "A List Apart · 5 min read",
+    },
+    {
+      topic: "CULTURE",
+      title: "The joy of paying attention",
+      source: "The Marginalian · 8 min read",
+    },
+    {
+      topic: "TECHNOLOGY",
+      title: "A more thoughtful kind of tech",
+      source: "MIT Technology Review · 6 min read",
+    },
+  ];
 
   async function handleLogin(): Promise<void> {
     if (!email.trim() || !password.trim()) {
@@ -69,236 +90,273 @@
     }
   }
 
-  function handleKeyPress(event: KeyboardEvent): void {
-    if (event.key === "Enter") {
-      handleLogin();
-    }
+  // Google OAuth is not wired up yet — keep the button as a visible stub.
+  function handleGoogleLogin(): void {
+    googleNotice =
+      "Google sign-in isn't available yet — please log in with email for now.";
   }
 </script>
 
-<div class="min-h-screen bg-white flex">
-  <!-- Left Side - Product Description -->
+<div class="flex min-h-screen bg-[#fcfbf7]">
+  <!-- Left · Editorial panel -->
   <div
-    class="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#FF6600] to-[#FF8533] p-12 flex-col justify-between relative overflow-hidden"
+    class="hidden flex-col justify-between bg-[#17362b] px-14 pt-[54px] pb-[46px] lg:flex lg:w-[45%]"
   >
-    <!-- Background Pattern -->
-    <div class="absolute inset-0 opacity-10">
-      <div
-        class="absolute top-20 left-20 w-64 h-64 bg-white rounded-full blur-3xl"
-      ></div>
-      <div
-        class="absolute bottom-20 right-20 w-96 h-96 bg-white rounded-full blur-3xl"
-      ></div>
-    </div>
-
-    <div class="relative z-10">
-      <!-- Logo/Brand -->
-      <div class="flex items-center gap-3 mb-16">
+    <div class="max-w-[550px]">
+      <!-- Brand -->
+      <div class="flex items-center gap-3">
         <div
-          class="bg-white w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#dce9b9] p-1.5"
         >
-          <Rss class="w-6 h-6 text-[#FF6600]" />
+          <img src={rssMark} alt="feedit.live" class="h-6 w-6" />
         </div>
-        <div>
-          <h1 class="text-3xl font-bold text-white">feedit.live</h1>
-        </div>
+        <p class="text-[29px] leading-[1.45] font-semibold text-[#fcfbf7]">
+          feedit.live
+        </p>
       </div>
 
-      <!-- Hero Section -->
-      <div class="max-w-md">
-        <h2 class="text-4xl font-bold text-white mb-6 leading-tight">
-          Your Personal Content Hub
-        </h2>
-        <p class="text-white/90 text-lg mb-12 leading-relaxed">
-          Save, organize, and discover content that matters. Manage your
-          bookmarks and RSS feeds all in one beautiful place.
+      <!-- Brand descriptor -->
+      <p class="mt-16 text-[10px] font-medium tracking-[1.5px] text-[#dce9b9]">
+        A LITTLE LESS NOISE. A LOT MORE YOU.
+      </p>
+
+      <!-- Welcome headline -->
+      <p class="mt-7 font-serif text-[57px] leading-[1.45] text-[#fcfbf7]">
+        Your world.<br />Worth reading.
+      </p>
+
+      <!-- Welcome description -->
+      <p class="mt-[22px] text-base leading-[1.45] text-[#c1cec4]">
+        All your favorite blogs, news, and ideas.<br />
+        One quiet place to keep up with what matters.
+      </p>
+
+      <!-- Your daily reading preview -->
+      <div
+        class="mt-[66px] w-full max-w-[538px] rounded-[14px] bg-[#fcfbf7] p-6"
+      >
+        <p class="text-[9px] font-semibold tracking-[1.2px] text-[#627368]">
+          A FRESH PERSPECTIVE, EVERY DAY
         </p>
-
-        <!-- Features -->
-        <div class="space-y-6">
-          <div class="flex items-start gap-4">
-            <div
-              class="bg-white/20 backdrop-blur-sm w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-            >
-              <Rss class="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 class="text-white font-semibold text-lg mb-1">
-                RSS Feed Reader
-              </h3>
-              <p class="text-white/80 text-sm">
-                Subscribe to your favorite blogs and news sources. Get all your
-                updates in one unified feed.
-              </p>
-            </div>
-          </div>
-
-          <div class="flex items-start gap-4">
-            <div
-              class="bg-white/20 backdrop-blur-sm w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-            >
-              <Bookmark class="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h3 class="text-white font-semibold text-lg mb-1">
-                Smart Bookmarks
-              </h3>
-              <p class="text-white/80 text-sm">
-                Save and organize your favorite websites with one click. Never
-                lose track of important content.
-              </p>
-            </div>
-          </div>
+        <div class="mt-[11px] flex items-center justify-between gap-4">
+          <p class="font-serif text-[25px] leading-[1.45] text-[#17362b]">
+            Your daily collection
+          </p>
+          <span
+            class="flex h-7 shrink-0 items-center justify-center rounded-[14px] bg-[#e8edde] px-[15px] text-[10px] font-medium text-[#315442]"
+          >
+            3 unread
+          </span>
         </div>
+
+        {#each previewArticles as article, i}
+          <div
+            class="flex items-start border-t border-[#e4e6de] pt-[10px] {i === 0
+              ? 'mt-[16px]'
+              : 'mt-[22px]'}"
+          >
+            <p
+              class="w-[91px] shrink-0 pt-[3px] text-[8px] font-semibold tracking-[0.8px] text-[#5c735c]"
+            >
+              {article.topic}
+            </p>
+            <div class="min-w-0 flex-1">
+              <p class="text-[13px] font-medium text-[#253b31]">
+                {article.title}
+              </p>
+              <p class="mt-[4px] text-[10px] text-[#687268]">
+                {article.source}
+              </p>
+            </div>
+          </div>
+        {/each}
       </div>
     </div>
 
-    <!-- Bottom Quote -->
-    <div class="relative z-10">
-      <p class="text-white/70 text-sm italic">
-        "The best way to stay informed and organized in the digital age."
+    <!-- Bottom -->
+    <div>
+      <div class="flex items-center gap-2.5">
+        <img src={quietReadingIndicator} alt="" class="h-1.5 w-1.5 shrink-0" />
+        <p class="text-xs leading-[1.45] text-[#c1cec4]">
+          No algorithms. No noise. Just your interests.
+        </p>
+      </div>
+      <p class="mt-[70px] text-[9px] font-medium tracking-[1px] text-[#afc1b4]">
+        CURATED BY YOU. ENJOYED AT YOUR PACE.
       </p>
     </div>
   </div>
 
-  <!-- Right Side - Login Form -->
+  <!-- Right · Authentication -->
   <div
-    class="w-full lg:w-1/2 flex items-center justify-center p-8 bg-gradient-to-br from-[#FFF5EE] to-white"
+    class="flex min-h-screen w-full flex-col px-8 pt-[58px] pb-[37px] lg:w-[55%] lg:px-16"
   >
-    <div class="w-full max-w-md">
-      <!-- Mobile Logo -->
-      <div class="lg:hidden flex items-center justify-center gap-3 mb-8">
+    <!-- Mobile brand + account switch -->
+    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+      <div class="flex items-center gap-3 lg:hidden">
         <div
-          class="bg-[#FF6600] w-12 h-12 rounded-xl flex items-center justify-center shadow-lg"
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[#dce9b9] p-1.5"
         >
-          <Rss class="w-6 h-6 text-white" />
+          <img src={rssMark} alt="feedit.live" class="h-6 w-6" />
         </div>
-        <h1 class="text-2xl font-bold text-gray-900">feedit.live</h1>
+        <p class="text-2xl font-semibold text-[#17362b]">feedit.live</p>
       </div>
-
-      <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold tracking-tight text-gray-900 mb-2">
-          Welcome Back
-        </h1>
-        <p class="text-gray-600">Sign in to access your content hub</p>
-      </div>
-
-      <Card class="bg-white rounded-xl shadow-xl p-8 border border-gray-100">
-        <form
-          onsubmit={(e) => {
-            e.preventDefault();
-            handleLogin();
-          }}
-          class="space-y-6"
+      <p class="ml-auto text-xs leading-[1.45]">
+        <span class="text-[#737c72]">New to feedit.live?</span>
+        <a
+          href="/signup"
+          class="ml-2 font-semibold text-[#315d43] hover:underline"
         >
-          <div>
+          Create an account ↗
+        </a>
+      </p>
+    </div>
+
+    <!-- Login form
+
+         Raw <input>/<button> elements are used here instead of the shared ui
+         components: their baked-in blue defaults override per-page classes due
+         to Tailwind v4 CSS ordering, so they cannot express this design
+         reliably without touching every page that uses them. -->
+    <div class="flex flex-1 items-center justify-center py-12">
+      <form
+        novalidate
+        class="flex w-full max-w-[430px] flex-col gap-[22px]"
+        onsubmit={(e) => {
+          e.preventDefault();
+          handleLogin();
+        }}
+      >
+        <div class="flex flex-col gap-[8px]">
+          <h1 class="text-[32px] leading-[1.45] font-semibold text-[#1d3528]">
+            Welcome back.
+          </h1>
+          <p class="text-sm leading-[1.45] text-[#737c72]">
+            Your favorite reads are right where you left them.
+          </p>
+        </div>
+
+        <div>
+          <button
+            type="button"
+            onclick={handleGoogleLogin}
+            class="flex h-12 w-full items-center justify-center rounded-[7px] border border-[#d9ded4] bg-[#fcfbf7] text-sm font-medium text-[#243c30] transition-colors hover:bg-white focus:ring-2 focus:ring-[#315d43]/50 focus:outline-none"
+          >
+            Continue with Google
+          </button>
+          {#if googleNotice}
+            <p
+              class="mt-2 text-center text-[11px] leading-[1.45] text-[#7b8278]"
+            >
+              {googleNotice}
+            </p>
+          {/if}
+        </div>
+
+        <div class="flex items-center gap-4">
+          <div class="h-px flex-1 bg-[#dfe2d8]"></div>
+          <p class="text-[11px] leading-[1.45] text-[#7b8278]">
+            or log in with email
+          </p>
+          <div class="h-px flex-1 bg-[#dfe2d8]"></div>
+        </div>
+
+        <div class="flex flex-col gap-[18px]">
+          <div class="flex flex-col gap-[8px]">
             <label
               for="email"
-              class="block text-sm font-medium text-gray-700 mb-2"
+              class="text-xs leading-[1.45] font-medium text-[#34483a]"
             >
-              Email Address
+              Email address
             </label>
-            <div class="relative">
-              <div
-                class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
-              >
-                <Mail class="h-5 w-5 text-gray-400" />
-              </div>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                bind:value={email}
-                onkeypress={handleKeyPress}
-                disabled={isLoading}
-                class="pl-10 h-11 rounded-lg border-gray-200 focus:border-[#FF6600] focus:ring-[#FF6600]"
-                autocomplete="email"
-              />
-            </div>
+            <input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              bind:value={email}
+              disabled={isLoading}
+              autocomplete="email"
+              class="h-12 w-full rounded-[7px] border border-[#d9ded4] bg-white px-[15px] text-[13px] text-[#34483a] transition-colors placeholder:text-[#879084] focus:border-[#315d43] focus:ring-2 focus:ring-[#315d43]/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            />
           </div>
 
-          <div>
+          <div class="flex flex-col gap-[8px]">
             <label
               for="password"
-              class="block text-sm font-medium text-gray-700 mb-2"
+              class="text-xs leading-[1.45] font-medium text-[#34483a]"
             >
               Password
             </label>
             <div class="relative">
-              <div
-                class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"
-              >
-                <Lock class="h-5 w-5 text-gray-400" />
-              </div>
-              <Input
+              <input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="Enter your password"
                 bind:value={password}
-                onkeypress={handleKeyPress}
                 disabled={isLoading}
-                class="pl-10 h-11 rounded-lg border-gray-200 focus:border-[#FF6600] focus:ring-[#FF6600]"
                 autocomplete="current-password"
+                class="h-12 w-full rounded-[7px] border border-[#d9ded4] bg-white px-[15px] pr-12 text-[13px] text-[#34483a] transition-colors placeholder:text-[#879084] focus:border-[#315d43] focus:ring-2 focus:ring-[#315d43]/30 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
               />
+              <button
+                type="button"
+                onclick={() => (showPassword = !showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                class="absolute top-1/2 right-4 -translate-y-1/2 rounded p-0.5 focus:ring-2 focus:ring-[#315d43]/50 focus:outline-none"
+              >
+                <img src={showPasswordIcon} alt="" class="h-5 w-5" />
+              </button>
             </div>
           </div>
+        </div>
 
-          {#if errorMessage}
-            <div
-              class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm"
-              role="alert"
-            >
-              {errorMessage}
-            </div>
-          {/if}
-
-          <Button
-            type="submit"
-            onclick={handleLogin}
-            disabled={isLoading}
-            class="w-full h-11 bg-[#FF6600] hover:bg-[#FF8533] rounded-lg font-semibold text-base shadow-lg hover:shadow-xl transition-all"
+        <!-- Remember me is visual only for now — not yet wired to auth
+             (local vs session storage). Forgot password is out of scope. -->
+        <div class="flex items-center gap-2">
+          <input
+            id="remember"
+            type="checkbox"
+            class="h-4 w-4 rounded-[3px] accent-[#315d43]"
+          />
+          <label
+            for="remember"
+            class="flex-1 text-xs leading-[1.45] text-[#677461]"
           >
-            {isLoading ? "Signing in..." : "Sign In"}
-          </Button>
-        </form>
-
-        <div class="mt-6 text-center">
-          <p class="text-sm text-gray-600">
-            Don't have an account?
-            <a
-              href="/signup"
-              class="text-[#FF6600] hover:text-[#FF8533] font-medium ml-1"
-            >
-              Create one now
-            </a>
-          </p>
+            Remember me
+          </label>
         </div>
-      </Card>
 
-      <!-- Mobile Features Preview -->
-      <div class="lg:hidden mt-8 space-y-4">
-        <p class="text-center text-sm text-gray-500 font-medium">
-          Why choose feedit.live?
+        {#if errorMessage}
+          <div
+            class="rounded-[7px] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            role="alert"
+          >
+            {errorMessage}
+          </div>
+        {/if}
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          class="flex h-[50px] w-full items-center justify-center gap-3 rounded-[7px] bg-[#315d43] text-sm font-semibold text-white transition-colors hover:bg-[#2a4d39] focus:ring-2 focus:ring-[#315d43]/50 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isLoading ? "Signing in..." : "Log in"}
+          {#if !isLoading}
+            <img src={continueArrow} alt="" class="h-5 w-5" />
+          {/if}
+        </button>
+
+        <p class="text-center text-[11px] leading-[1.45] text-[#7b8278]">
+          Pick up where your curiosity left off.
         </p>
-        <div class="grid grid-cols-2 gap-4">
-          <div class="text-center">
-            <div
-              class="bg-[#FFE6D5] w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-2"
-            >
-              <Rss class="w-5 h-5 text-[#FF6600]" />
-            </div>
-            <p class="text-xs text-gray-600">RSS Feeds</p>
-          </div>
-          <div class="text-center">
-            <div
-              class="bg-[#FFE6D5] w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-2"
-            >
-              <Bookmark class="w-5 h-5 text-[#FF6600]" />
-            </div>
-            <p class="text-xs text-gray-600">Bookmarks</p>
-          </div>
-        </div>
-      </div>
+      </form>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex items-start gap-[22px] text-[11px] leading-[1.45]">
+      <p class="flex-1 text-[#7b8278]">© 2026 feedit.live</p>
+      <p class="text-[#737c72]">Privacy</p>
+      <p class="text-[#737c72]">Terms</p>
+      <p class="text-[#737c72]">Get help</p>
     </div>
   </div>
 </div>
