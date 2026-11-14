@@ -9,11 +9,18 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { API_BASE_URL } from "$lib/config";
-  import placeholderImage from "$lib/assets/feed-placeholder.svg";
   import searchIcon from "$lib/assets/search-icon.svg";
   import externalReadingCue from "$lib/assets/external-reading-cue.svg";
-  import unreadIndicator from "$lib/assets/unread-indicator.svg";
-  import openInNewTabIcon from "$lib/assets/open-in-new-tab.svg";
+  import StoryCard from "$lib/components/StoryCard.svelte";
+  import BookmarkButton from "$lib/components/BookmarkButton.svelte";
+  import { bookmarksStore } from "$lib/stores/bookmarks";
+  import {
+    buildSourceTitles,
+    formatStoryDate,
+    sourceLabel,
+    stripHtml,
+    urlKey,
+  } from "$lib/utils/story";
   import {
     subscriptionsStore,
     subscriptionsLoadingStore,
@@ -42,17 +49,16 @@
   let feedHasMore = $state<boolean>(true);
   let pageSize = $state<number>(30);
   let isLoading = $state<boolean>(false);
-  let isReloadingFeed = $state<boolean>(false);
   let notification = $state<{
     message: string;
     type: "success" | "error";
   } | null>(null);
   let notificationTimeout: number | null = null;
-  let bookmarkingFeedIds = $state<Set<string>>(new Set());
+  const bookmarksByUrl = bookmarksStore.byUrl;
+  const pendingBookmarks = bookmarksStore.pending;
 
-  // Feed view state (client-side search / filter / sorting)
+  // Feed view state (client-side search / sorting)
   let searchQuery = $state<string>("");
-  let filterMode = $state<"all" | "unread">("all");
   let sortMode = $state<"newest" | "oldest">("newest");
   let isMarkingAllRead = $state<boolean>(false);
 
@@ -70,10 +76,6 @@
       );
     }
 
-    if (filterMode === "unread") {
-      items = items.filter((feed) => !feed.is_read);
-    }
-
     return [...items].sort((a, b) => {
       const aTime = new Date(a.published_at).getTime();
       const bTime = new Date(b.published_at).getTime();
@@ -87,6 +89,13 @@
     if (!subscriptionId) return null;
     return $subscriptionsStore.find((s) => s.id === subscriptionId) ?? null;
   });
+
+  const sourceTitles = $derived(buildSourceTitles($subscriptionsStore));
+
+  function feedSource(feed: FeedItem): string {
+    if (activeSubscription) return activeSubscription.title;
+    return sourceLabel(feed.link, sourceTitles);
+  }
 
   const collectionDate = $derived(
     new Intl.DateTimeFormat("en-US", {
@@ -214,6 +223,8 @@
       if (!append && !cursor) {
         await subscriptionsStore.fetch();
         subscriptionsLoadingStore.setLoading(false);
+        // Bookmarks drive each card's "Saved" state and the sidebar count.
+        bookmarksStore.ensureLoaded();
       }
     } catch (error) {
       console.error("Failed to fetch feeds:", error);
@@ -269,108 +280,21 @@
     };
   });
 
-  function formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    // Less than 1 minute
-    if (diffMins < 1) return "just now";
-
-    // Less than 1 hour
-    if (diffMins < 60)
-      return `${diffMins} ${diffMins === 1 ? "minute" : "minutes"} ago`;
-
-    // Less than 24 hours
-    if (diffHours < 24)
-      return `${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
-
-    // Less than 7 days
-    if (diffDays < 7)
-      return `${diffDays} ${diffDays === 1 ? "day" : "days"} ago`;
-
-    // More than 7 days - show formatted date
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(date);
-  }
-
-  function extractDomain(url: string): string {
-    try {
-      const urlObject = new URL(url);
-      return urlObject.hostname;
-    } catch {
-      return url;
-    }
-  }
-
-  // RSS descriptions can contain HTML — reduce them to plain text.
-  function stripHtml(html: string): string {
-    if (!html) return "";
-    return html
-      .replace(/<[^>]*>/g, " ")
-      .replace(/&nbsp;/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-
-  async function reloadFeed(): Promise<void> {
-    if (isReloadingFeed) return;
-
-    isReloadingFeed = true;
-    feeds = [];
-    feedNextCursor = null;
-    feedHasMore = true;
-
-    try {
-      await fetchFeeds(null, false, true);
-    } finally {
-      isReloadingFeed = false;
-    }
-  }
-
-  async function addBookmark(url: string, feedId: string): Promise<void> {
-    // Prevent duplicate submissions for the same feed
-    if (bookmarkingFeedIds.has(feedId)) return;
-
-    // Add feedId to the set to mark it as being bookmarked
-    // Create a new Set to trigger Svelte 5 reactivity
-    bookmarkingFeedIds = new Set(bookmarkingFeedIds).add(feedId);
-
-    try {
-      const response = await authenticatedFetch(`${API_BASE_URL}/bookmarks`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url }),
-      });
-
-      if (response.status === 401) {
-        handleAuthError();
-        return;
-      }
-
-      if (!response.ok) {
-        showNotification(`Failed to add bookmark: ${response.status}`, "error");
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      showNotification("Bookmark added successfully!", "success");
-    } catch (error) {
-      console.error("Failed to add bookmark:", error);
-      showNotification("Failed to add bookmark", "error");
-    } finally {
-      // Remove feedId from the set to allow bookmarking again if needed
-      // Create a new Set to trigger Svelte 5 reactivity
-      const newSet = new Set(bookmarkingFeedIds);
-      newSet.delete(feedId);
-      bookmarkingFeedIds = newSet;
+  // Bookmark toggle: "Bookmark" saves the story, "Saved" removes it again.
+  async function toggleBookmark(feed: FeedItem): Promise<void> {
+    const existing = $bookmarksByUrl.get(urlKey(feed.link));
+    if (existing) {
+      const ok = await bookmarksStore.remove(existing);
+      showNotification(
+        ok ? "Removed from bookmarks." : "Couldn't remove the bookmark.",
+        ok ? "success" : "error",
+      );
+    } else {
+      const ok = await bookmarksStore.add(feed.link);
+      showNotification(
+        ok ? "Saved to bookmarks." : "Couldn't save the bookmark.",
+        ok ? "success" : "error",
+      );
     }
   }
 
@@ -455,12 +379,6 @@
       notificationTimeout = null;
     }, 3000);
   }
-
-  function getProxiedImageUrl(imageUrl: string): string {
-    if (!imageUrl) return placeholderImage;
-    // Proxy external images through our backend to avoid CORS issues
-    return `${API_BASE_URL}/proxy/image?url=${encodeURIComponent(imageUrl)}`;
-  }
 </script>
 
 <div class="min-h-full px-6 pt-[34px] pb-16 lg:px-10">
@@ -499,13 +417,11 @@
             : "Your daily collection"}
         </h1>
         <p class="mt-[10px] text-[13px] leading-[1.5] text-[#63715f]">
-          {feeds.length}
-          {feeds.length === 1 ? "article" : "articles"} · {unreadCount} unread ·
-          Curated by you
+          The latest stories from your subscriptions.
         </p>
       </div>
 
-      <div class="flex w-full flex-col lg:w-[472px] lg:shrink-0">
+      <div class="flex w-full flex-col lg:mt-[25px] lg:w-[472px] lg:shrink-0">
         <div class="relative">
           <img
             src={searchIcon}
@@ -534,34 +450,11 @@
       </div>
     </div>
 
-    <!-- Filters + sorting -->
-    <div
-      class="mt-[30px] flex flex-wrap items-center justify-between gap-x-4 gap-y-3"
-    >
-      <div class="flex items-center gap-2.5">
-        <button
-          type="button"
-          onclick={() => (filterMode = "all")}
-          aria-pressed={filterMode === "all"}
-          class="flex h-[34px] items-center rounded-[17px] px-[22px] text-[11px] font-medium transition-colors {filterMode ===
-          'all'
-            ? 'bg-[#17362b] text-white'
-            : 'bg-[#eef1e6] text-[#41553e] hover:bg-[#e2e7da]'}"
-        >
-          All {feeds.length}
-        </button>
-        <button
-          type="button"
-          onclick={() => (filterMode = "unread")}
-          aria-pressed={filterMode === "unread"}
-          class="flex h-[34px] items-center rounded-[17px] px-[22px] text-[11px] font-medium transition-colors {filterMode ===
-          'unread'
-            ? 'bg-[#17362b] text-white'
-            : 'bg-[#eef1e6] text-[#41553e] hover:bg-[#e2e7da]'}"
-        >
-          Unread {unreadCount}
-        </button>
-      </div>
+    <!-- Section heading + sorting -->
+    <div class="mt-[35px] flex items-center justify-between gap-4">
+      <h2 class="text-[16px] leading-[1.5] font-medium text-[#17362b]">
+        Latest stories
+      </h2>
       <button
         type="button"
         onclick={() => (sortMode = sortMode === "newest" ? "oldest" : "newest")}
@@ -573,7 +466,7 @@
     </div>
 
     <!-- Helper row -->
-    <div class="mt-[19px] flex items-center gap-[9px]">
+    <div class="mt-[21px] flex items-center gap-[9px]">
       <img src={externalReadingCue} alt="" class="h-3.5 w-3.5 shrink-0" />
       <p class="text-[11px] leading-[1.5] text-[#63715f]">
         Select a story to read the full article in a new tab.
@@ -629,109 +522,26 @@
           class="grid grid-cols-1 gap-x-6 gap-y-9 md:grid-cols-2 xl:grid-cols-3"
         >
           {#each displayedFeeds as feed (feed.id)}
-            <article class="flex flex-col">
-              <!-- Main picture -->
-              <a
-                href={feed.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                onclick={() => markFeedRead(feed.id)}
-                class="group relative block aspect-[408/230] overflow-hidden rounded-[10px]"
-                aria-label="Open article in a new tab"
-              >
-                <img
-                  src={getProxiedImageUrl(feed.main_image_url)}
-                  alt={feed.title || "Feed image"}
-                  class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  onerror={(e) => {
-                    const target = e.currentTarget as HTMLImageElement;
-                    target.src = placeholderImage;
-                  }}
+            <StoryCard
+              href={feed.link}
+              title={feed.title}
+              imageUrl={feed.main_image_url}
+              source={feedSource(feed)}
+              description={stripHtml(feed.description)}
+              meta={formatStoryDate(feed.published_at)}
+              isRead={feed.is_read}
+              onOpen={() => markFeedRead(feed.id)}
+            >
+              {#snippet action()}
+                <BookmarkButton
+                  variant={$bookmarksByUrl.has(urlKey(feed.link))
+                    ? "saved"
+                    : "save"}
+                  busy={$pendingBookmarks.has(urlKey(feed.link))}
+                  onclick={() => toggleBookmark(feed)}
                 />
-                {#if feed.is_read}
-                  <span
-                    class="absolute right-3 bottom-3 rounded-[5px] bg-[#fcfbf7] px-[14px] py-[6px] text-[9px] font-medium text-[#54705a]"
-                  >
-                    Read
-                  </span>
-                {/if}
-              </a>
-
-              <!-- Source -->
-              <div class="mt-4 flex items-center gap-[9px]">
-                {#if !feed.is_read}
-                  <img
-                    src={unreadIndicator}
-                    alt=""
-                    class="h-[5px] w-[5px] shrink-0"
-                  />
-                {/if}
-                <p
-                  class="truncate text-[10px] font-semibold tracking-[0.6px] text-[#54705a] uppercase"
-                >
-                  {extractDomain(feed.link)}
-                </p>
-              </div>
-
-              <!-- Headline + actions -->
-              <div class="mt-[11px] flex items-start justify-between gap-3">
-                <h3
-                  class="line-clamp-2 min-w-0 flex-1 text-[18px] leading-[1.5] text-[#17362b] {feed.is_read
-                    ? 'font-medium'
-                    : 'font-semibold'}"
-                >
-                  <a
-                    href={feed.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onclick={() => markFeedRead(feed.id)}
-                    class="transition-colors hover:text-[#315d43]"
-                  >
-                    {feed.title || "Untitled Feed"}
-                  </a>
-                </h3>
-                <div class="flex shrink-0 items-start pt-[5px] pr-0.5">
-                  <button
-                    type="button"
-                    onclick={() => addBookmark(feed.link, feed.id)}
-                    disabled={bookmarkingFeedIds.has(feed.id)}
-                    class="rounded p-1 text-[#54705A] transition-colors hover:text-[#315d43] disabled:cursor-not-allowed disabled:opacity-50"
-                    aria-label="Bookmark this feed"
-                    title={bookmarkingFeedIds.has(feed.id)
-                      ? "Saving..."
-                      : "Bookmark"}
-                  >
-                    <Bookmark class="h-[17px] w-[17px]" strokeWidth={1.6} />
-                  </button>
-                  <a
-                    href={feed.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onclick={() => markFeedRead(feed.id)}
-                    class="rounded p-1"
-                    aria-label="Open in new tab"
-                  >
-                    <img
-                      src={openInNewTabIcon}
-                      alt=""
-                      class="h-[17px] w-[17px]"
-                    />
-                  </a>
-                </div>
-              </div>
-
-              <!-- Preview -->
-              <p
-                class="mt-[10px] line-clamp-2 text-[12px] leading-[1.5] text-[#63715f]"
-              >
-                {stripHtml(feed.description)}
-              </p>
-
-              <!-- Metadata -->
-              <p class="mt-[13px] text-[10px] leading-[1.5] text-[#63715f]">
-                {formatDate(feed.published_at)}
-              </p>
-            </article>
+              {/snippet}
+            </StoryCard>
           {/each}
         </div>
       {/if}
@@ -759,35 +569,6 @@
             <span class="text-sm font-medium text-[#63715f]"
               >Loading more...</span
             >
-          </div>
-        </div>
-      {/if}
-
-      <!-- Feed footer -->
-      {#if !feedHasMore && feeds.length > 0}
-        <div class="mt-14">
-          <div class="h-px bg-[#e0e5d8]"></div>
-          <div
-            class="mt-[18px] flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-[11px] leading-[1.5] text-[#63715f]"
-          >
-            <p>
-              All {feeds.length}
-              {feeds.length === 1 ? "story" : "stories"} from your subscriptions.
-            </p>
-            <div class="flex items-center gap-5">
-              <p>
-                {displayedFeeds.length} of {feeds.length}
-                {feeds.length === 1 ? "story" : "stories"}
-              </p>
-              <button
-                type="button"
-                onclick={reloadFeed}
-                disabled={isReloadingFeed}
-                class="font-medium text-[#315d43] transition-opacity hover:underline disabled:opacity-50 disabled:hover:no-underline"
-              >
-                {isReloadingFeed ? "Refreshing..." : "Refresh"}
-              </button>
-            </div>
           </div>
         </div>
       {/if}

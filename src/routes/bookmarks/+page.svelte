@@ -1,61 +1,60 @@
 <script lang="ts">
-  import { Button } from "$lib/components/ui/button";
-  import { Input } from "$lib/components/ui/input";
-  import {
-    ExternalLink,
-    Bookmark,
-    Loader2,
-    Plus,
-    AlertCircle,
-    Trash2,
-  } from "lucide-svelte";
-  import {
-    authenticatedFetch,
-    isAuthenticated,
-    removeToken,
-  } from "$lib/utils/auth";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { API_BASE_URL } from "$lib/config";
-  import placeholderImage from "$lib/assets/feed-placeholder.svg";
+  import { Bookmark, AlertCircle } from "lucide-svelte";
+  import { isAuthenticated } from "$lib/utils/auth";
+  import searchIcon from "$lib/assets/search-icon.svg";
+  import externalReadingCue from "$lib/assets/external-reading-cue.svg";
+  import StoryCard from "$lib/components/StoryCard.svelte";
+  import BookmarkButton from "$lib/components/BookmarkButton.svelte";
+  import { bookmarksStore, type BookmarkItem } from "$lib/stores/bookmarks";
+  import {
+    subscriptionsStore,
+    subscriptionsLoadingStore,
+  } from "$lib/stores/subscriptions";
+  import {
+    buildSourceTitles,
+    formatStoryDate,
+    sourceLabel,
+    stripHtml,
+    urlKey,
+  } from "$lib/utils/story";
 
-  interface BookmarkItem {
-    id: string;
-    url: string;
-    title: string;
-    user_id: string;
-    main_image_url: string;
-    content_summary: string;
-    created_at: string;
-  }
+  const bookmarks = bookmarksStore.items;
+  const bookmarksLoaded = bookmarksStore.loaded;
+  const bookmarksLoading = bookmarksStore.loading;
+  const pendingBookmarks = bookmarksStore.pending;
 
-  interface BookmarkResponse {
-    data: BookmarkItem[];
-    next_cursor: string | null;
-    has_more: boolean;
-  }
+  let searchQuery = $state("");
+  let sortMode = $state<"recent" | "oldest">("recent");
 
-  let bookmarks = $state<BookmarkItem[]>([]);
-  let nextCursor = $state<string | null>(null);
-  let hasMore = $state<boolean>(true);
-  let isLoading = $state<boolean>(false);
-  let pageSize = $state<number>(30);
-  let newBookmarkUrl = $state<string>("");
-  let isAddingBookmark = $state<boolean>(false);
   let notification = $state<{
     message: string;
     type: "success" | "error";
   } | null>(null);
-  let notificationTimeout: number | null = null;
+  let notificationTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  function handleAuthError(): void {
-    removeToken();
-    goto("/login");
-  }
+  const sourceTitles = $derived(buildSourceTitles($subscriptionsStore));
 
-  function openLink(url: string): void {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
+  const displayedBookmarks = $derived.by(() => {
+    let items = $bookmarks;
+
+    const query = searchQuery.trim().toLowerCase();
+    if (query) {
+      items = items.filter(
+        (b) =>
+          (b.title || "").toLowerCase().includes(query) ||
+          (b.content_summary || "").toLowerCase().includes(query) ||
+          b.url.toLowerCase().includes(query),
+      );
+    }
+
+    return [...items].sort((a, b) => {
+      const aTime = new Date(a.created_at).getTime();
+      const bTime = new Date(b.created_at).getTime();
+      return sortMode === "recent" ? bTime - aTime : aTime - bTime;
+    });
+  });
 
   onMount(() => {
     if (!isAuthenticated()) {
@@ -63,367 +62,183 @@
       return;
     }
 
-    fetchBookmarks();
+    bookmarksStore.reload();
+
+    // Arriving here directly: the sidebar's subscription list (and the
+    // cards' source names) still need the subscriptions.
+    if ($subscriptionsLoadingStore) {
+      subscriptionsStore
+        .fetch()
+        .finally(() => subscriptionsLoadingStore.setLoading(false));
+    }
   });
 
-  async function fetchBookmarks(
-    cursor: string | null = null,
-    append: boolean = false,
-  ): Promise<void> {
-    if (isLoading) return;
-
-    isLoading = true;
-    try {
-      const url = cursor
-        ? `${API_BASE_URL}/bookmarks?next_cursor=${cursor}&page_size=${pageSize}`
-        : `${API_BASE_URL}/bookmarks?page_size=${pageSize}`;
-
-      const response = await authenticatedFetch(url);
-
-      if (response.status === 401) {
-        handleAuthError();
-        return;
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: BookmarkResponse = await response.json();
-
-      if (append) {
-        bookmarks = [...bookmarks, ...data.data];
-      } else {
-        bookmarks = data.data;
-      }
-
-      nextCursor = data.next_cursor;
-      hasMore = data.has_more;
-    } catch (error) {
-      console.error("Failed to fetch bookmarks:", error);
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  function loadMore(): void {
-    if (hasMore && !isLoading && nextCursor) {
-      fetchBookmarks(nextCursor, true);
-    }
-  }
-
-  async function addBookmark(): Promise<void> {
-    // Prevent duplicate submissions
-    if (!newBookmarkUrl.trim() || isAddingBookmark) return;
-
-    let formattedUrl = newBookmarkUrl.trim();
-    if (
-      !formattedUrl.startsWith("http://") &&
-      !formattedUrl.startsWith("https://")
-    ) {
-      formattedUrl = "https://" + formattedUrl;
-    }
-
-    // Set loading state immediately to prevent double-clicks
-    isAddingBookmark = true;
-
-    try {
-      const response = await authenticatedFetch(`${API_BASE_URL}/bookmarks`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ url: formattedUrl }),
-      });
-
-      if (response.status === 401) {
-        handleAuthError();
-        return;
-      }
-
-      if (!response.ok) {
-        showNotification(`Failed to add bookmark: ${response.status}`, "error");
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      newBookmarkUrl = "";
-      showNotification("Bookmark added successfully!", "success");
-
-      // Refresh the list to show the new bookmark
-      // Reset pagination state
-      bookmarks = [];
-      nextCursor = null;
-      hasMore = true;
-      await fetchBookmarks();
-    } catch (error) {
-      console.error("Failed to add bookmark:", error);
-      showNotification("Failed to add bookmark", "error");
-    } finally {
-      isAddingBookmark = false;
-    }
-  }
-
-  async function deleteBookmark(id: string): Promise<void> {
-    if (!confirm("Are you sure you want to delete this bookmark?")) return;
-
-    try {
-      const response = await authenticatedFetch(
-        `${API_BASE_URL}/bookmarks/${id}`,
-        {
-          method: "DELETE",
-        },
-      );
-
-      if (response.status === 401) {
-        handleAuthError();
-        return;
-      }
-
-      if (!response.ok) {
-        showNotification(
-          `Failed to delete bookmark: ${response.status}`,
-          "error",
-        );
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      bookmarks = bookmarks.filter((b) => b.id !== id);
-      showNotification("Bookmark deleted successfully!", "success");
-    } catch (error) {
-      console.error("Failed to delete bookmark:", error);
-      showNotification("Failed to delete bookmark", "error");
-    }
+  async function removeBookmark(bookmark: BookmarkItem): Promise<void> {
+    const ok = await bookmarksStore.remove(bookmark);
+    showNotification(
+      ok ? "Removed from bookmarks." : "Couldn't remove the bookmark.",
+      ok ? "success" : "error",
+    );
   }
 
   function showNotification(
     message: string,
     type: "success" | "error" = "success",
   ): void {
-    if (notificationTimeout) {
-      clearTimeout(notificationTimeout);
-    }
-
+    if (notificationTimeout) clearTimeout(notificationTimeout);
     notification = { message, type };
-
     notificationTimeout = setTimeout(() => {
       notification = null;
       notificationTimeout = null;
     }, 3000);
   }
-
-  function formatDate(dateString: string): string {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(date);
-  }
-
-  function extractDomain(url: string): string {
-    try {
-      const urlObject = new URL(url);
-      return urlObject.hostname;
-    } catch {
-      return url;
-    }
-  }
-
-  function getProxiedImageUrl(imageUrl: string): string {
-    if (!imageUrl) return placeholderImage;
-    // Proxy external images through our backend to avoid CORS issues
-    return `${API_BASE_URL}/proxy/image?url=${encodeURIComponent(imageUrl)}`;
-  }
 </script>
 
-<div class="min-h-screen bg-white p-4 lg:p-6">
+<div class="min-h-full px-6 pt-[34px] pb-16 lg:px-10">
   <!-- Notification Toast -->
   {#if notification}
     <div
-      class={`fixed top-4 right-4 px-4 py-2 rounded-md shadow-md z-50 flex items-center gap-2 animate-slide-in ${
-        notification.type === "success"
-          ? "bg-[#FF6600] text-white"
-          : "bg-red-500 text-white"
-      }`}
+      class="animate-slide-in fixed top-4 right-4 z-50 flex items-center gap-2 rounded-[7px] px-4 py-2 text-white shadow-md {notification.type ===
+      'success'
+        ? 'bg-[#315d43]'
+        : 'bg-red-500'}"
     >
       {#if notification.type === "success"}
-        <Bookmark class="w-4 h-4" />
+        <Bookmark class="h-4 w-4" />
       {:else}
-        <AlertCircle class="w-4 h-4" />
+        <AlertCircle class="h-4 w-4" />
       {/if}
       <span class="text-sm">{notification.message}</span>
     </div>
   {/if}
 
-  <div class="mx-auto max-w-7xl">
+  <div class="mx-auto w-full max-w-[1312px]">
     <!-- Page Header -->
-    <div class="mb-4">
-      <h1 class="text-2xl font-semibold text-gray-900">Bookmarks</h1>
-    </div>
-
-    <!-- Add Bookmark Form -->
-    <div class="border border-[#FFD4B3] rounded-lg p-4 mb-4">
-      <div class="flex gap-2">
-        <Input
-          id="bookmark-input"
-          type="text"
-          placeholder="Paste a link to bookmark (e.g., https://example.com/article)"
-          bind:value={newBookmarkUrl}
-          onkeypress={(e) => {
-            if (e.key === "Enter") {
-              addBookmark();
-            }
-          }}
-          class="flex-1 h-9 rounded-md border-[#FFBA80] focus:border-[#FF6600] focus:ring-[#FF6600]"
-          disabled={isAddingBookmark}
-        />
-        <Button
-          onclick={addBookmark}
-          disabled={isAddingBookmark || !newBookmarkUrl.trim()}
-          class="h-9 px-3 bg-[#FF6600] hover:bg-[#FF8533] text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+    <div
+      class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between"
+    >
+      <div>
+        <p class="text-[10px] font-semibold tracking-[1.2px] text-[#63715f]">
+          YOUR READING SPACE
+        </p>
+        <h1
+          class="mt-[13px] font-serif text-[34px] leading-[1.3] text-[#17362b]"
         >
-          {#if isAddingBookmark}
-            <div class="flex items-center gap-2">
-              <Loader2 class="animate-spin h-4 w-4" />
-              <span>Adding...</span>
-            </div>
-          {:else}
-            <Plus class="w-4 h-4 mr-1" />
-            <span>Add</span>
-          {/if}
-        </Button>
+          Your bookmarks
+        </h1>
+        <p class="mt-[10px] text-[13px] leading-[1.5] text-[#63715f]">
+          Good stories, kept for later. All your saved articles in one place.
+        </p>
+      </div>
+
+      <div class="relative w-full lg:mt-[25px] lg:w-[472px] lg:shrink-0">
+        <img
+          src={searchIcon}
+          alt=""
+          class="pointer-events-none absolute top-1/2 left-[15px] h-[18px] w-[18px] -translate-y-1/2"
+        />
+        <input
+          type="search"
+          bind:value={searchQuery}
+          placeholder="Search bookmarks"
+          aria-label="Search bookmarks"
+          class="h-[46px] w-full rounded-[8px] border border-[#dce1d5] bg-[#f2f4ec] pr-4 pl-[46px] text-[13px] text-[#17362b] transition-colors placeholder:text-[#63715f] focus:border-[#315d43] focus:bg-white focus:outline-none"
+        />
       </div>
     </div>
 
-    <div class="space-y-4">
-      {#if bookmarks.length === 0 && !isLoading}
-        <div class="border border-[#FFD4B3] rounded-lg p-8 text-center">
-          <div
-            class="bg-[#FFE6D5] w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2"
-          >
-            <Bookmark class="w-5 h-5 text-[#FF6600]" />
-          </div>
-          <p class="text-gray-600 text-sm">No bookmarks yet</p>
-          <p class="text-gray-400 text-xs mt-1">
-            Save interesting articles to read later!
-          </p>
-        </div>
-      {:else}
-        <!-- Bookmark Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {#each bookmarks as bookmark (bookmark.id)}
-            <div
-              class="rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col bg-white"
-            >
-              <!-- Main Image -->
+    <!-- Section heading + sorting -->
+    <div class="mt-[35px] flex items-center justify-between gap-4">
+      <h2 class="text-[16px] leading-[1.5] font-medium text-[#17362b]">
+        Saved articles{$bookmarksLoaded ? ` · ${$bookmarks.length}` : ""}
+      </h2>
+      <button
+        type="button"
+        onclick={() => (sortMode = sortMode === "recent" ? "oldest" : "recent")}
+        class="text-[11px] text-[#63715f] transition-colors hover:text-[#315d43]"
+        title="Toggle sort order"
+      >
+        {sortMode === "recent" ? "Recently saved ↓" : "Oldest saved ↑"}
+      </button>
+    </div>
+
+    <!-- Helper row -->
+    <div class="mt-[21px] flex items-center gap-[9px]">
+      <img src={externalReadingCue} alt="" class="h-3.5 w-3.5 shrink-0" />
+      <p class="text-[11px] leading-[1.5] text-[#63715f]">
+        Select a story to read the full article in a new tab.
+      </p>
+    </div>
+
+    <div class="mt-[21px]">
+      {#if $bookmarksLoading && $bookmarks.length === 0}
+        <!-- Initial Loading State - Skeleton Grid -->
+        <div
+          class="grid grid-cols-1 gap-x-6 gap-y-9 md:grid-cols-2 xl:grid-cols-3"
+        >
+          {#each Array(3) as _, i (i)}
+            <div class="flex flex-col">
               <div
-                class="w-full h-48 overflow-hidden cursor-pointer bg-gray-100"
-                onclick={() => openLink(bookmark.url)}
-                role="button"
-                tabindex="0"
-                onkeydown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    openLink(bookmark.url);
-                  }
-                }}
-              >
-                <img
-                  src={getProxiedImageUrl(bookmark.main_image_url)}
-                  alt={bookmark.title || "Bookmark image"}
-                  class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                  onerror={(e) => {
-                    const target = e.currentTarget as HTMLImageElement;
-                    target.src = placeholderImage;
-                  }}
-                />
-              </div>
-
-              <!-- Content -->
-              <div class="p-3 flex-1 flex flex-col">
-                <h3
-                  class="text-base font-medium text-gray-900 mb-2 line-clamp-2 cursor-pointer hover:text-gray-600 transition-colors"
-                  onclick={() => openLink(bookmark.url)}
-                  role="button"
-                  tabindex="0"
-                  onkeydown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      openLink(bookmark.url);
-                    }
-                  }}
-                >
-                  {bookmark.title || "Untitled Bookmark"}
-                </h3>
-
-                <div class="text-xs text-gray-500 mb-2 space-y-1">
-                  <p class="flex items-center gap-1">
-                    <ExternalLink class="w-3 h-3 flex-shrink-0" />
-                    {extractDomain(bookmark.url)}
-                  </p>
-                  <p>{formatDate(bookmark.created_at)}</p>
-                </div>
-
-                {#if bookmark.content_summary}
-                  <p class="text-xs text-gray-600 line-clamp-2 mb-3 flex-1">
-                    {bookmark.content_summary}
-                  </p>
-                {/if}
-
+                class="animate-shimmer aspect-[408/230] rounded-[10px] bg-gradient-to-r from-[#eef1e6] via-[#f6f7f1] to-[#eef1e6] bg-[length:200%_100%]"
+              ></div>
+              <div class="mt-4 space-y-3">
                 <div
-                  class="pt-2 mt-auto border-t border-orange-50 flex justify-end"
-                >
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      deleteBookmark(bookmark.id);
-                    }}
-                    class="text-[#FF6600] hover:text-[#FF8533] hover:bg-[#FFE6D5] h-7 px-2 text-xs"
-                    aria-label="Delete bookmark"
-                  >
-                    <Trash2 class="w-3 h-3 mr-1" />
-                    Delete
-                  </Button>
-                </div>
+                  class="animate-shimmer h-4 w-3/4 rounded bg-gradient-to-r from-[#dce6d3] via-[#e8ecdf] to-[#dce6d3] bg-[length:200%_100%]"
+                ></div>
+                <div
+                  class="animate-shimmer h-3 w-1/2 rounded bg-gradient-to-r from-[#dce6d3] via-[#e8ecdf] to-[#dce6d3] bg-[length:200%_100%]"
+                ></div>
               </div>
             </div>
           {/each}
         </div>
-      {/if}
-
-      <!-- Loading Indicator -->
-      {#if isLoading}
-        <div class="border border-[#FFD4B3] rounded-lg p-4 mt-4">
-          <div class="flex items-center justify-center gap-2">
-            <Loader2 class="animate-spin w-5 h-5 text-[#FF6600]" />
-            <span class="text-sm text-gray-600">Loading bookmarks...</span>
+      {:else if $bookmarks.length === 0}
+        <!-- Empty state -->
+        <div class="rounded-[14px] border border-[#dce1d5] p-8 text-center">
+          <div
+            class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#dce6d3]"
+          >
+            <Bookmark class="h-5 w-5 text-[#315d43]" />
           </div>
-        </div>
-      {/if}
-
-      <!-- Load More Button -->
-      {#if hasMore && !isLoading && bookmarks.length > 0}
-        <div class="border border-[#FFD4B3] rounded-lg p-4 mt-4">
-          <div class="flex justify-center">
-            <Button
-              onclick={() => loadMore()}
-              class="h-8 px-4 bg-[#FF6600] hover:bg-[#FF8533] text-white rounded-md text-sm"
-            >
-              Load More
-            </Button>
-          </div>
-        </div>
-      {/if}
-
-      <!-- End of List -->
-      {#if !hasMore && bookmarks.length > 0}
-        <div class="border border-[#FFD4B3] rounded-lg p-4 mt-4 text-center">
-          <p class="text-sm text-gray-500">
-            You've reached the end of your bookmarks
+          <p class="text-sm text-[#41553e]">No bookmarks yet</p>
+          <p class="mt-1 text-xs text-[#63715f]">
+            Use <span class="font-medium text-[#315d43]">Bookmark</span> on any
+            story in
+            <a href="/" class="text-[#315d43] underline">your feed</a> to keep it
+            here.
           </p>
         </div>
+      {:else if displayedBookmarks.length === 0}
+        <p class="py-16 text-center text-sm text-[#63715f]">
+          No bookmarks match your search.
+        </p>
+      {:else}
+        <div
+          class="grid grid-cols-1 gap-x-6 gap-y-9 md:grid-cols-2 xl:grid-cols-3"
+        >
+          {#each displayedBookmarks as bookmark (bookmark.id)}
+            <StoryCard
+              href={bookmark.url}
+              title={bookmark.title}
+              imageUrl={bookmark.main_image_url}
+              source={sourceLabel(bookmark.url, sourceTitles)}
+              description={stripHtml(bookmark.content_summary)}
+              meta={formatStoryDate(bookmark.created_at)}
+            >
+              {#snippet action()}
+                <BookmarkButton
+                  variant="remove"
+                  busy={$pendingBookmarks.has(urlKey(bookmark.url))}
+                  onclick={() => removeBookmark(bookmark)}
+                />
+              {/snippet}
+            </StoryCard>
+          {/each}
+        </div>
+
+        <p class="mt-9 text-[11px] leading-[1.5] text-[#63715f]">
+          Remove a bookmark anytime. The original article stays with its source.
+        </p>
       {/if}
     </div>
   </div>
@@ -441,7 +256,20 @@
     }
   }
 
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
   :global(.animate-slide-in) {
     animation: slide-in 0.3s ease-out;
+  }
+
+  :global(.animate-shimmer) {
+    animation: shimmer 2s infinite linear;
   }
 </style>

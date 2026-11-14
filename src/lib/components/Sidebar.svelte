@@ -1,22 +1,26 @@
 <script lang="ts">
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
-  import { Bookmark, Menu, X } from "lucide-svelte";
+  import { Menu, X } from "lucide-svelte";
   import { getUser, removeToken } from "$lib/utils/auth";
   import {
     subscriptionsStore,
     subscriptionsLoadingStore,
   } from "$lib/stores/subscriptions";
   import { feedStatsStore } from "$lib/stores/feedStats";
+  import { bookmarksStore } from "$lib/stores/bookmarks";
   import rssMark from "$lib/assets/rss-mark.svg";
   import plusIcon from "$lib/assets/plus-icon.svg";
   import gridIcon from "$lib/assets/grid-icon.svg";
   import rssIcon from "$lib/assets/rss-icon.svg";
   import chevronIcon from "$lib/assets/chevron-icon.svg";
+  import bookmarkOutlineIcon from "$lib/assets/bookmark-outline-icon.svg";
 
   let { isMobileMenuOpen = $bindable(false) } = $props();
 
   const user = $derived(getUser());
+  const bookmarks = bookmarksStore.items;
+  const bookmarksLoaded = bookmarksStore.loaded;
   let showAllSubscriptions = $state(false);
 
   const displayedSubscriptions = $derived(
@@ -30,6 +34,7 @@
   // Don't load subscriptions on mount - let the main page trigger it after feeds load
 
   function handleLogout() {
+    bookmarksStore.reset();
     removeToken();
     goto("/login");
   }
@@ -78,7 +83,7 @@
 
 <!-- Sidebar -->
 <aside
-  class="fixed top-0 left-0 z-40 flex h-full w-[248px] flex-col overflow-y-auto bg-[#eef1e6] px-6 pt-[33px] pb-6 transition-transform duration-300 {isMobileMenuOpen
+  class="fixed top-0 left-0 z-40 flex h-full w-[248px] flex-col overflow-y-auto [scrollbar-width:none] *:shrink-0 [&::-webkit-scrollbar]:hidden bg-[#eef1e6] px-6 pt-[33px] pb-6 transition-transform duration-300 {isMobileMenuOpen
     ? 'translate-x-0'
     : '-translate-x-full lg:translate-x-0'}"
 >
@@ -124,11 +129,7 @@
       : 'hover:bg-[#dce6d3]/60'}"
   >
     <img src={gridIcon} alt="" class="h-[18px] w-[18px] shrink-0" />
-    <span
-      class="flex-1 text-[13px] font-semibold {isAllFeedsActive()
-        ? 'text-[#315d43]'
-        : 'text-[#41553e]'}"
-    >
+    <span class="flex-1 text-[13px] font-semibold text-[#315d43]">
       All feeds
     </span>
     {#if $feedStatsStore.total > 0}
@@ -138,8 +139,27 @@
     {/if}
   </button>
 
+  <button
+    onclick={() => navigateTo("/bookmarks")}
+    class="-mx-2 mt-[6px] flex h-10 w-[calc(100%+16px)] items-center gap-3 rounded-[6px] pr-2 pl-[15px] text-left transition-colors {isActive(
+      '/bookmarks',
+    )
+      ? 'bg-[#dce6d3]'
+      : 'hover:bg-[#dce6d3]/60'}"
+  >
+    <img src={bookmarkOutlineIcon} alt="" class="h-[18px] w-[18px] shrink-0" />
+    <span class="flex-1 text-[13px] font-semibold text-[#315d43]">
+      Bookmarks
+    </span>
+    {#if $bookmarksLoaded}
+      <span class="text-[13px] font-semibold text-[#315d43]">
+        {$bookmarks.length}
+      </span>
+    {/if}
+  </button>
+
   <!-- Subscriptions -->
-  <div class="mt-12 flex items-baseline justify-between gap-2">
+  <div class="mt-[27px] flex items-baseline justify-between gap-2">
     <p class="text-[10px] font-semibold tracking-[1.1px] text-[#63715f]">
       SUBSCRIPTIONS
     </p>
@@ -148,7 +168,7 @@
       class="text-[10px] text-[#54705a] hover:underline {isActive(
         '/subscriptions',
       )
-        ? 'underline'
+        ? 'font-semibold underline'
         : ''}"
     >
       Manage
@@ -223,25 +243,9 @@
     </p>
   </div>
 
-  <!-- Bottom: bookmarks + account -->
+  <!-- Bottom: account. The design's "Settings" row is omitted until a
+       settings page exists. -->
   <div class="mt-auto pt-10">
-    <!-- The design shows a "Settings" row here; no settings page exists,
-         so this slot holds Bookmarks to keep the page reachable. -->
-    <button
-      onclick={() => navigateTo("/bookmarks")}
-      class="-mx-2 flex w-[calc(100%+16px)] items-center gap-[11px] rounded-[7px] px-[10px] py-[15px] text-left transition-colors {isActive(
-        '/bookmarks',
-      )
-        ? 'bg-[#dce6d3]'
-        : 'hover:bg-[#dce6d3]/60'}"
-    >
-      <Bookmark
-        class="h-[18px] w-[18px] shrink-0 text-[#54705A]"
-        strokeWidth={1.6}
-      />
-      <span class="text-[12px] text-[#41553e]">Bookmarks</span>
-    </button>
-
     <div class="mt-6 h-px bg-[#d6ddce]"></div>
 
     {#if user}
