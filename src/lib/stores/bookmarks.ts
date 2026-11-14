@@ -34,11 +34,22 @@ function createBookmarksStore() {
   // URL keys with a save/remove request in flight (blocks double clicks).
   const pending = writable<Set<string>>(new Set());
 
+  // The in-flight full load, shared by every caller that wants the list.
   let loadPromise: Promise<void> | null = null;
+  // Bumped on every new load (and on reset) so a superseded load can never
+  // overwrite newer data.
+  let generation = 0;
+  // Saves/removals made while a load is running. The load's snapshot may
+  // predate them, so they are re-applied on top of what it fetched.
+  let addedDuringLoad = new Map<string, BookmarkItem>();
+  let removedDuringLoad = new Set<string>();
 
   function handleAuthError(): void {
+    generation++;
+    loadPromise = null;
     items.set([]);
     loaded.set(false);
+    loading.set(false);
     removeToken();
     goto("/login");
   }
@@ -52,16 +63,34 @@ function createBookmarksStore() {
     });
   }
 
-  async function fetchAll(): Promise<void> {
-    loading.set(true);
+  function mergeLocalChanges(fetched: BookmarkItem[]): BookmarkItem[] {
+    // Pages can overlap if bookmarks change mid-load; keep one copy of each
+    // id (duplicate keys would break keyed lists).
+    const seen = new Set<string>();
+    const unique = fetched.filter((b) => {
+      if (seen.has(b.id) || removedDuringLoad.has(b.id)) return false;
+      seen.add(b.id);
+      return true;
+    });
+    const added = [...addedDuringLoad.values()].filter((b) => !seen.has(b.id));
+    return [...added, ...unique];
+  }
+
+  async function fetchAll(gen: number): Promise<void> {
+    // On the first load, publish each page as it arrives so the bookmarks
+    // page and "Saved" states appear after one request, not after all of
+    // them. A refresh of an already-loaded list swaps in the result at the
+    // end instead, so the list doesn't shrink and regrow.
+    const progressive = !get(loaded);
     try {
       const all: BookmarkItem[] = [];
       let cursor: string | null = null;
       do {
         const url: string = cursor
-          ? `${API_BASE_URL}/bookmarks?next_cursor=${cursor}&page_size=${PAGE_SIZE}`
+          ? `${API_BASE_URL}/bookmarks?next_cursor=${encodeURIComponent(cursor)}&page_size=${PAGE_SIZE}`
           : `${API_BASE_URL}/bookmarks?page_size=${PAGE_SIZE}`;
         const response = await authenticatedFetch(url);
+        if (gen !== generation) return;
         if (response.status === 401) {
           handleAuthError();
           return;
@@ -70,17 +99,43 @@ function createBookmarksStore() {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const page: BookmarkResponse = await response.json();
+        if (gen !== generation) return;
         all.push(...(page.data ?? []));
         cursor = page.has_more ? page.next_cursor : null;
+        if (progressive && cursor) items.set(mergeLocalChanges(all));
       } while (cursor);
 
-      items.set(all);
+      items.set(mergeLocalChanges(all));
       loaded.set(true);
     } catch (error) {
       console.error("Failed to fetch bookmarks:", error);
     } finally {
-      loading.set(false);
+      if (gen === generation) loading.set(false);
     }
+  }
+
+  function startLoad(): Promise<void> {
+    const gen = ++generation;
+    addedDuringLoad = new Map();
+    removedDuringLoad = new Set();
+    loading.set(true);
+    const promise: Promise<void> = fetchAll(gen).finally(() => {
+      if (loadPromise === promise) loadPromise = null;
+    });
+    loadPromise = promise;
+    return promise;
+  }
+
+  /** Record a local change so an in-flight load doesn't undo it. */
+  function noteAdded(item: BookmarkItem): void {
+    if (!loadPromise) return;
+    addedDuringLoad.set(item.id, item);
+    removedDuringLoad.delete(item.id);
+  }
+  function noteRemoved(id: string): void {
+    if (!loadPromise) return;
+    removedDuringLoad.add(id);
+    addedDuringLoad.delete(id);
   }
 
   return {
@@ -99,24 +154,21 @@ function createBookmarksStore() {
     /** Load once per session; concurrent callers share the request. */
     ensureLoaded(): Promise<void> {
       if (get(loaded)) return Promise.resolve();
-      loadPromise ??= fetchAll().finally(() => {
-        loadPromise = null;
-      });
-      return loadPromise;
+      return loadPromise ?? startLoad();
     },
 
     /** Forget the current user's bookmarks (logout). */
     reset(): void {
+      generation++;
+      loadPromise = null;
       items.set([]);
       loaded.set(false);
-      loadPromise = null;
+      loading.set(false);
     },
 
+    /** Refresh the list. Joins a load that is already running. */
     reload(): Promise<void> {
-      loadPromise = fetchAll().finally(() => {
-        loadPromise = null;
-      });
-      return loadPromise;
+      return loadPromise ?? startLoad();
     },
 
     /** Save a URL. Returns true on success. */
@@ -147,12 +199,16 @@ function createBookmarksStore() {
             ? body
             : undefined;
         if (created) {
+          noteAdded(created);
           items.update(($items) => [
             created,
             ...$items.filter((b) => b.id !== created.id),
           ]);
         } else {
-          await fetchAll();
+          // A load already running may have been sent before this save,
+          // so wait for it and then load again.
+          await loadPromise?.catch(() => {});
+          await (loadPromise ?? startLoad());
         }
         return true;
       } catch (error) {
@@ -180,6 +236,7 @@ function createBookmarksStore() {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
+        noteRemoved(bookmark.id);
         items.update(($items) => $items.filter((b) => b.id !== bookmark.id));
         return true;
       } catch (error) {

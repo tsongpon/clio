@@ -25,8 +25,14 @@
   const bookmarksLoading = bookmarksStore.loading;
   const pendingBookmarks = bookmarksStore.pending;
 
+  // Cards are drawn in batches as the reader scrolls, so a large library
+  // doesn't create every card (and start every image request) at once.
+  const BATCH_SIZE = 30;
+
   let searchQuery = $state("");
   let sortMode = $state<"recent" | "oldest">("recent");
+  let visibleCount = $state(BATCH_SIZE);
+  let moreTrigger = $state<HTMLElement | null>(null);
 
   let notification = $state<{
     message: string;
@@ -49,11 +55,36 @@
       );
     }
 
-    return [...items].sort((a, b) => {
-      const aTime = new Date(a.created_at).getTime();
-      const bTime = new Date(b.created_at).getTime();
-      return sortMode === "recent" ? bTime - aTime : aTime - bTime;
-    });
+    const direction = sortMode === "recent" ? -1 : 1;
+    return items
+      .map((b) => ({ b, t: Date.parse(b.created_at) || 0 }))
+      .sort((x, y) => (x.t - y.t) * direction)
+      .map(({ b }) => b);
+  });
+
+  const visibleBookmarks = $derived(displayedBookmarks.slice(0, visibleCount));
+
+  // Start from the first batch again whenever the search or sort changes.
+  $effect(() => {
+    void searchQuery;
+    void sortMode;
+    visibleCount = BATCH_SIZE;
+  });
+
+  // Reveal the next batch when the end of the list scrolls into view.
+  // Re-observing after each batch re-checks the trigger, in case it is
+  // still on screen (e.g. on a very tall window).
+  $effect(() => {
+    void visibleCount;
+    if (!moreTrigger) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) visibleCount += BATCH_SIZE;
+      },
+      { rootMargin: "600px" },
+    );
+    observer.observe(moreTrigger);
+    return () => observer.disconnect();
   });
 
   onMount(() => {
@@ -216,7 +247,7 @@
         <div
           class="grid grid-cols-1 gap-x-6 gap-y-9 md:grid-cols-2 xl:grid-cols-3"
         >
-          {#each displayedBookmarks as bookmark (bookmark.id)}
+          {#each visibleBookmarks as bookmark (bookmark.id)}
             <StoryCard
               href={bookmark.url}
               title={bookmark.title}
@@ -235,6 +266,10 @@
             </StoryCard>
           {/each}
         </div>
+
+        {#if visibleCount < displayedBookmarks.length}
+          <div bind:this={moreTrigger} class="h-px" aria-hidden="true"></div>
+        {/if}
 
         <p class="mt-9 text-[11px] leading-[1.5] text-[#63715f]">
           Remove a bookmark anytime. The original article stays with its source.

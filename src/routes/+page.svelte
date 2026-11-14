@@ -13,6 +13,7 @@
   import externalReadingCue from "$lib/assets/external-reading-cue.svg";
   import StoryCard from "$lib/components/StoryCard.svelte";
   import BookmarkButton from "$lib/components/BookmarkButton.svelte";
+  import { invalidateUnreadCounts } from "$lib/stores/unreadCounts";
   import { bookmarksStore } from "$lib/stores/bookmarks";
   import {
     buildSourceTitles,
@@ -150,6 +151,9 @@
     previousSubscriptionId = subscriptionId;
     isInitialized = true;
     fetchFeeds(null, false, true);
+    // Bookmarks drive each card's "Saved" state and the sidebar count; load
+    // them alongside the feed rather than after it.
+    bookmarksStore.ensureLoaded();
   });
 
   // Watch for URL parameter changes and reload feeds
@@ -223,8 +227,6 @@
       if (!append && !cursor) {
         await subscriptionsStore.fetch();
         subscriptionsLoadingStore.setLoading(false);
-        // Bookmarks drive each card's "Saved" state and the sidebar count.
-        bookmarksStore.ensureLoaded();
       }
     } catch (error) {
       console.error("Failed to fetch feeds:", error);
@@ -318,6 +320,7 @@
         return false;
       }
 
+      invalidateUnreadCounts();
       return true;
     } catch (error) {
       console.error("Failed to mark as read:", error);

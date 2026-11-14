@@ -16,13 +16,19 @@
   import plusIcon from "$lib/assets/plus-icon.svg";
   import rssIcon from "$lib/assets/rss-icon.svg";
   import searchIcon from "$lib/assets/search-icon.svg";
+  import {
+    getCachedUnread,
+    setCachedUnread,
+    type UnreadInfo,
+  } from "$lib/stores/unreadCounts";
 
   // Unread counts per subscription. The subscriptions API has no unread
   // field, so each feed's newest page is fetched and its unread stories
   // counted ("+" when the feed has more stories than that page).
+  // Counts are cached briefly across visits and the requests are cancelled
+  // when leaving the page.
   const UNREAD_PAGE_SIZE = 100;
   const UNREAD_CONCURRENCY = 4;
-  type UnreadInfo = { count: number; more: boolean } | "error";
 
   let newFeedUrl = $state("");
   let isAddingFeed = $state(false);
@@ -52,34 +58,55 @@
     goto("/login");
   }
 
+  // Aborted when the page is left, which stops the unread-count requests.
+  const pageLife = new AbortController();
+
   onMount(() => {
     if (!isAuthenticated()) {
       goto("/login");
       return;
     }
     loadSubscriptions();
+    return () => pageLife.abort();
   });
 
   async function loadSubscriptions(): Promise<void> {
     await subscriptionsStore.fetch();
     subscriptionsLoadingStore.setLoading(false);
-    loadUnreadCounts($subscriptionsStore.filter((s) => !(s.id in unread)));
+    if (pageLife.signal.aborted) return;
+
+    const missing: RSSSubscription[] = [];
+    for (const s of $subscriptionsStore) {
+      if (s.id in unread) continue;
+      const cached = getCachedUnread(s.id);
+      if (cached) unread[s.id] = cached;
+      else missing.push(s);
+    }
+    loadUnreadCounts(missing);
   }
 
   async function loadUnreadCounts(subs: RSSSubscription[]): Promise<void> {
     const queue = [...subs];
+    const { signal } = pageLife;
     const worker = async () => {
       for (let sub = queue.shift(); sub; sub = queue.shift()) {
-        unread[sub.id] = await fetchUnread(sub.id);
+        const info = await fetchUnread(sub.id, signal);
+        if (signal.aborted) return;
+        setCachedUnread(sub.id, info);
+        unread[sub.id] = info;
       }
     };
     await Promise.all(Array.from({ length: UNREAD_CONCURRENCY }, worker));
   }
 
-  async function fetchUnread(subscriptionId: string): Promise<UnreadInfo> {
+  async function fetchUnread(
+    subscriptionId: string,
+    signal: AbortSignal,
+  ): Promise<UnreadInfo> {
     try {
       const response = await authenticatedFetch(
-        `${API_BASE_URL}/feeds?page_size=${UNREAD_PAGE_SIZE}&retrieve_feed=false&subscription_id=${subscriptionId}`,
+        `${API_BASE_URL}/feeds?page_size=${UNREAD_PAGE_SIZE}&retrieve_feed=false&subscription_id=${encodeURIComponent(subscriptionId)}`,
+        { signal },
       );
       if (!response.ok) return "error";
       const data: { data: { is_read: boolean }[]; has_more: boolean } =

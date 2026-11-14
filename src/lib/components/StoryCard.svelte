@@ -49,6 +49,8 @@
       <img
         src={getProxiedImageUrl(imageUrl)}
         alt={title || "Story image"}
+        loading="lazy"
+        decoding="async"
         class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         onerror={() => (imageFailed = true)}
       />
