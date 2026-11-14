@@ -2,135 +2,100 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main]
   pull_request:
-    branches: [main, master, develop]
+    branches: [main]
+
+# A newer push to the same branch cancels the older run, so deploys never
+# race each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SERVICE_NAME: clio
+  IMAGE: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/clio
 
 jobs:
-  # test:
-  #   name: Unit Tests
-  #   runs-on: ubuntu-latest
-
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-
-  #     - name: Set up Go
-  #       uses: actions/setup-go@v5
-  #       with:
-  #         go-version: "1.25"
-  #         cache: true
-
-  #     - name: Verify dependencies
-  #       run: go mod verify
-
-  #     - name: Download dependencies
-  #       run: go mod download
-
-  #     - name: Run tests
-  #       run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
-
-  #     - name: Generate coverage report
-  #       run: go tool cover -func=coverage.out
-
-  #     - name: Upload coverage to Codecov
-  #       uses: codecov/codecov-action@v4
-  #       with:
-  #         file: ./coverage.out
-  #         flags: unittests
-  #         name: codecov-umbrella
-  #       continue-on-error: true
-
-  #     - name: Check test coverage threshold
-  #       run: |
-  #         COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-  #         echo "Total coverage: ${COVERAGE}%"
-  #         COVERAGE_INT=${COVERAGE%.*}
-  #         if [ "$COVERAGE_INT" -lt 60 ]; then
-  #           echo "Coverage ${COVERAGE}% is below threshold of 80%"
-  #           exit 1
-  #         fi
-  #         echo "Coverage check passed!"
-
-  build:
-    name: Build and Push Docker Image
+  check:
+    name: Type check and build
     runs-on: ubuntu-latest
-    # Only run on push to main/master, not on pull requests
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-
-    outputs:
-      image_tag: ${{ steps.meta.outputs.tags }}
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+      - uses: actions/setup-node@v4
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          node-version: 20
+          cache: npm
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Configure Docker for Artifact Registry
-        run: |
-          gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
-
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/clio
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
 
   deploy:
-    name: Deploy to Cloud Run
+    name: Build image and deploy to Cloud Run
     runs-on: ubuntu-latest
-    needs: build
-    # Only run on push to main/master
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    needs: check
+    # Only deploy pushes to main, never pull requests.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      id-token: write # needed only for Workload Identity Federation
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      # Authentication: set the GCP_WIF_PROVIDER and GCP_DEPLOY_SA repository
+      # variables to use Workload Identity Federation (no stored key);
+      # otherwise the GCP_SA_KEY secret (service account JSON key) is used.
+      - name: Authenticate to Google Cloud (Workload Identity)
+        if: vars.GCP_WIF_PROVIDER != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      - name: Authenticate to Google Cloud (service account key)
+        if: vars.GCP_WIF_PROVIDER == ''
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v2
 
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Tagged with the commit SHA (what gets deployed) and "latest".
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Deploys the exact image built above, not ":latest".
       - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy clio \
-            --image=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_ARTIFACT_REGISTRY_REPO }}/clio:latest \
-            --platform=managed \
-            --region=${{ secrets.GCP_REGION }} \
-            --allow-unauthenticated \
-            --port=1323 \
-            --set-env-vars="GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" \
-            --max-instances=10 \
-            --min-instances=0 \
-            --memory=512Mi \
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ secrets.GCP_REGION }}
+          image: ${{ env.IMAGE }}:${{ github.sha }}
+          flags: >-
+            --allow-unauthenticated
+            --port=3000
+            --max-instances=10
+            --min-instances=0
+            --memory=512Mi
             --cpu=1
 
-      - name: Get Cloud Run URL
-        run: |
-          SERVICE_URL=$(gcloud run services describe clio --platform=managed --region=${{ secrets.GCP_REGION }} --format='value(status.url)')
-          echo "Service deployed to: $SERVICE_URL"
-          echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_OUTPUT
+      - name: Show service URL
+        run: echo "Deployed to ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"

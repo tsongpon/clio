@@ -41,12 +41,12 @@
     </p>
 
     <div class="button-group">
-      <Button on:click={handleReLogin} variant="default">
+      <Button onclick={handleReLogin} variant="default">
         {#snippet children()}
           Login Now
         {/snippet}
       </Button>
-      <Button on:click={handleRefresh} variant="ghost">
+      <Button onclick={handleRefresh} variant="ghost">
         {#snippet children()}
           Try Again
         {/snippet}

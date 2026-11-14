@@ -18,3 +18,7 @@ dist
 coverage
 *.log
 .npm
+
+# GCP service account keys
+key.json
+*-key.json
