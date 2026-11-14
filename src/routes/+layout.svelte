@@ -25,12 +25,12 @@
 </svelte:head>
 
 {#if showSidebar}
-  <div class="flex h-screen overflow-hidden bg-white">
+  <div class="flex h-screen overflow-hidden bg-[#fcfbf7]">
     <Sidebar bind:isMobileMenuOpen />
 
     <!-- Main Content Area -->
     <main
-      class="flex-1 overflow-y-auto lg:ml-60 bg-gray-50"
+      class="flex-1 overflow-y-auto bg-[#fcfbf7] lg:ml-[248px] lg:border-l lg:border-[#dce1d5]"
       style="touch-action: pan-y pinch-zoom;"
     >
       <div class="min-h-full">

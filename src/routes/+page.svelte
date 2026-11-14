@@ -1,13 +1,6 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import { Button } from "$lib/components/ui/button";
-  import { Card } from "$lib/components/ui/card";
-  import {
-    ExternalLink,
-    RefreshCw,
-    Bookmark,
-    AlertCircle,
-  } from "lucide-svelte";
+  import { RefreshCw, Bookmark, AlertCircle } from "lucide-svelte";
   import {
     authenticatedFetch,
     isAuthenticated,
@@ -17,10 +10,15 @@
   import { goto } from "$app/navigation";
   import { API_BASE_URL } from "$lib/config";
   import placeholderImage from "$lib/assets/feed-placeholder.svg";
+  import searchIcon from "$lib/assets/search-icon.svg";
+  import externalReadingCue from "$lib/assets/external-reading-cue.svg";
+  import unreadIndicator from "$lib/assets/unread-indicator.svg";
+  import openInNewTabIcon from "$lib/assets/open-in-new-tab.svg";
   import {
     subscriptionsStore,
     subscriptionsLoadingStore,
   } from "$lib/stores/subscriptions";
+  import { feedStatsStore } from "$lib/stores/feedStats";
 
   interface FeedItem {
     id: string;
@@ -52,13 +50,53 @@
   let notificationTimeout: number | null = null;
   let bookmarkingFeedIds = $state<Set<string>>(new Set());
 
-  // Get current subscription name for display
-  const currentSubscriptionName = $derived.by(() => {
+  // Feed view state (client-side search / filter / sorting)
+  let searchQuery = $state<string>("");
+  let filterMode = $state<"all" | "unread">("all");
+  let sortMode = $state<"newest" | "oldest">("newest");
+  let isMarkingAllRead = $state<boolean>(false);
+
+  const unreadCount = $derived(feeds.filter((feed) => !feed.is_read).length);
+
+  const displayedFeeds = $derived.by(() => {
+    let items = feeds;
+
+    const query = searchQuery.trim().toLowerCase();
+    if (query) {
+      items = items.filter(
+        (feed) =>
+          (feed.title || "").toLowerCase().includes(query) ||
+          (feed.description || "").toLowerCase().includes(query),
+      );
+    }
+
+    if (filterMode === "unread") {
+      items = items.filter((feed) => !feed.is_read);
+    }
+
+    return [...items].sort((a, b) => {
+      const aTime = new Date(a.published_at).getTime();
+      const bTime = new Date(b.published_at).getTime();
+      return sortMode === "newest" ? bTime - aTime : aTime - bTime;
+    });
+  });
+
+  // The subscription currently filtering the feed (via ?subscription_id=)
+  const activeSubscription = $derived.by(() => {
     const subscriptionId = $page.url.searchParams.get("subscription_id");
     if (!subscriptionId) return null;
-    // We don't have access to subscriptions here, so we'll just show it's filtered
-    return "Filtered Feed";
+    return $subscriptionsStore.find((s) => s.id === subscriptionId) ?? null;
   });
+
+  const collectionDate = $derived(
+    new Intl.DateTimeFormat("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    })
+      .format(new Date())
+      .toUpperCase(),
+  );
 
   function handleAuthError(): void {
     // Clear invalid token
@@ -67,11 +105,15 @@
     goto("/login");
   }
 
-  async function openFeedLink(feedId: string, url: string): Promise<void> {
-    // Open the link first for immediate user feedback
-    window.open(url, "_blank", "noopener,noreferrer");
+  function updateFeedStats(): void {
+    feedStatsStore.set({
+      total: feeds.length,
+      unread: feeds.filter((feed) => !feed.is_read).length,
+    });
+  }
 
-    // Mark as read in the background
+  // Articles open via anchor links; mark them read in the background.
+  async function markFeedRead(feedId: string): Promise<void> {
     const success = await markAsRead(feedId);
 
     if (success) {
@@ -79,6 +121,7 @@
       feeds = feeds.map((feed) =>
         feed.id === feedId ? { ...feed, is_read: true } : feed,
       );
+      updateFeedStats();
     }
   }
 
@@ -154,13 +197,6 @@
 
       const data: FeedResponse = await response.json();
 
-      console.log("fetchFeeds response:", {
-        itemsCount: data.data.length,
-        nextCursor: data.next_cursor,
-        hasMore: data.has_more,
-        append,
-      });
-
       // Update feeds array
       if (append) {
         feeds = [...feeds, ...data.data];
@@ -172,24 +208,12 @@
       feedNextCursor = data.next_cursor;
       feedHasMore = data.has_more;
 
+      updateFeedStats();
+
       // Load subscriptions after initial feed load completes
       if (!append && !cursor) {
         await subscriptionsStore.fetch();
         subscriptionsLoadingStore.setLoading(false);
-      }
-
-      // Check if page is scrollable after initial load
-      if (!append) {
-        setTimeout(() => {
-          const isScrollable =
-            document.documentElement.scrollHeight > window.innerHeight;
-          console.log("Page scrollability check:", {
-            scrollHeight: document.documentElement.scrollHeight,
-            windowHeight: window.innerHeight,
-            isScrollable,
-            feedCount: feeds.length,
-          });
-        }, 100);
       }
     } catch (error) {
       console.error("Failed to fetch feeds:", error);
@@ -199,11 +223,6 @@
   }
 
   function loadMoreFeeds(): void {
-    console.log("loadMoreFeeds called:", {
-      feedHasMore,
-      isLoading,
-      feedNextCursor,
-    });
     if (feedHasMore && !isLoading && feedNextCursor) {
       fetchFeeds(feedNextCursor, true, false);
     }
@@ -218,21 +237,12 @@
       return;
     }
 
-    console.log("Setting up IntersectionObserver");
-
     // Create intersection observer for infinite scroll
     // Use callback that reads latest state values instead of capturing them
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
         if (!entry) return;
-
-        console.log("Intersection event:", {
-          isIntersecting: entry.isIntersecting,
-          feedHasMore,
-          isLoading,
-          feedNextCursor,
-        });
 
         // Read current state values directly (not captured in closure)
         if (
@@ -241,7 +251,6 @@
           !isLoading &&
           feedNextCursor
         ) {
-          console.log("Triggering load more feeds");
           loadMoreFeeds();
         }
       },
@@ -256,7 +265,6 @@
 
     // Cleanup
     return () => {
-      console.log("Cleaning up IntersectionObserver");
       observer.disconnect();
     };
   });
@@ -299,6 +307,16 @@
     } catch {
       return url;
     }
+  }
+
+  // RSS descriptions can contain HTML — reduce them to plain text.
+  function stripHtml(html: string): string {
+    if (!html) return "";
+    return html
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   async function reloadFeed(): Promise<void> {
@@ -383,6 +401,45 @@
     }
   }
 
+  // Bulk mark-read for the loaded stories (one request per unread story).
+  async function markAllAsRead(): Promise<void> {
+    const unreadFeeds = feeds.filter((feed) => !feed.is_read);
+    if (unreadFeeds.length === 0 || isMarkingAllRead) return;
+
+    isMarkingAllRead = true;
+
+    try {
+      const results = await Promise.allSettled(
+        unreadFeeds.map((feed) => markAsRead(feed.id)),
+      );
+
+      const readIds = new Set<string>();
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled" && result.value) {
+          readIds.add(unreadFeeds[index].id);
+        }
+      });
+
+      if (readIds.size > 0) {
+        feeds = feeds.map((feed) =>
+          readIds.has(feed.id) ? { ...feed, is_read: true } : feed,
+        );
+        updateFeedStats();
+      }
+
+      if (readIds.size === unreadFeeds.length) {
+        showNotification("All stories marked as read.", "success");
+      } else {
+        showNotification(
+          `Marked ${readIds.size} of ${unreadFeeds.length} stories as read.`,
+          readIds.size > 0 ? "success" : "error",
+        );
+      }
+    } finally {
+      isMarkingAllRead = false;
+    }
+  }
+
   function showNotification(
     message: string,
     type: "success" | "error" = "success",
@@ -406,229 +463,331 @@
   }
 </script>
 
-<div class="min-h-screen bg-white p-4 lg:p-6">
+<div class="min-h-full px-6 pt-[34px] pb-16 lg:px-10">
   <!-- Notification Toast -->
   {#if notification}
     <div
-      class={`fixed top-4 right-4 px-4 py-2 rounded-md shadow-md z-50 flex items-center gap-2 animate-slide-in ${
+      class={`animate-slide-in fixed top-4 right-4 z-50 flex items-center gap-2 rounded-[7px] px-4 py-2 shadow-md ${
         notification.type === "success"
-          ? "bg-[#FF6600] text-white"
+          ? "bg-[#315d43] text-white"
           : "bg-red-500 text-white"
       }`}
     >
       {#if notification.type === "success"}
-        <Bookmark class="w-4 h-4" />
+        <Bookmark class="h-4 w-4" />
       {:else}
-        <AlertCircle class="w-4 h-4" />
+        <AlertCircle class="h-4 w-4" />
       {/if}
       <span class="text-sm">{notification.message}</span>
     </div>
   {/if}
-  <div class="mx-auto max-w-7xl">
+
+  <div class="mx-auto w-full max-w-[1312px]">
     <!-- Page Header -->
-    <div class="mb-4">
-      <h1 class="text-2xl font-semibold text-gray-900">
-        {#if $page.url.searchParams.get("subscription_id")}
-          Filtered Feed
-        {:else}
-          All Feed
-        {/if}
-      </h1>
+    <div
+      class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between"
+    >
+      <div>
+        <p class="text-[10px] font-semibold tracking-[1.2px] text-[#63715f]">
+          {collectionDate}
+        </p>
+        <h1
+          class="mt-[13px] font-serif text-[34px] leading-[1.3] text-[#17362b]"
+        >
+          {activeSubscription
+            ? activeSubscription.title
+            : "Your daily collection"}
+        </h1>
+        <p class="mt-[10px] text-[13px] leading-[1.5] text-[#63715f]">
+          {feeds.length}
+          {feeds.length === 1 ? "article" : "articles"} · {unreadCount} unread ·
+          Curated by you
+        </p>
+      </div>
+
+      <div class="flex w-full flex-col lg:w-[472px] lg:shrink-0">
+        <div class="relative">
+          <img
+            src={searchIcon}
+            alt=""
+            class="pointer-events-none absolute top-1/2 left-[15px] h-[18px] w-[18px] -translate-y-1/2"
+          />
+          <input
+            type="search"
+            bind:value={searchQuery}
+            placeholder="Search your articles"
+            aria-label="Search your articles"
+            class="h-[46px] w-full rounded-[8px] border border-[#dce1d5] bg-[#f2f4ec] pr-4 pl-[46px] text-[13px] text-[#17362b] transition-colors placeholder:text-[#63715f] focus:border-[#315d43] focus:bg-white focus:outline-none"
+          />
+        </div>
+        <div class="mt-[14px] flex justify-end">
+          <button
+            type="button"
+            onclick={markAllAsRead}
+            disabled={isMarkingAllRead || unreadCount === 0}
+            class="text-[11px] font-medium text-[#315d43] transition-opacity hover:underline disabled:opacity-50 disabled:hover:no-underline"
+            title="Mark all loaded stories as read"
+          >
+            {isMarkingAllRead ? "Marking..." : "Mark all as read"}
+          </button>
+        </div>
+      </div>
     </div>
 
-    <div class="space-y-4">
+    <!-- Filters + sorting -->
+    <div
+      class="mt-[30px] flex flex-wrap items-center justify-between gap-x-4 gap-y-3"
+    >
+      <div class="flex items-center gap-2.5">
+        <button
+          type="button"
+          onclick={() => (filterMode = "all")}
+          aria-pressed={filterMode === "all"}
+          class="flex h-[34px] items-center rounded-[17px] px-[22px] text-[11px] font-medium transition-colors {filterMode ===
+          'all'
+            ? 'bg-[#17362b] text-white'
+            : 'bg-[#eef1e6] text-[#41553e] hover:bg-[#e2e7da]'}"
+        >
+          All {feeds.length}
+        </button>
+        <button
+          type="button"
+          onclick={() => (filterMode = "unread")}
+          aria-pressed={filterMode === "unread"}
+          class="flex h-[34px] items-center rounded-[17px] px-[22px] text-[11px] font-medium transition-colors {filterMode ===
+          'unread'
+            ? 'bg-[#17362b] text-white'
+            : 'bg-[#eef1e6] text-[#41553e] hover:bg-[#e2e7da]'}"
+        >
+          Unread {unreadCount}
+        </button>
+      </div>
+      <button
+        type="button"
+        onclick={() => (sortMode = sortMode === "newest" ? "oldest" : "newest")}
+        class="text-[11px] text-[#63715f] transition-colors hover:text-[#315d43]"
+        title="Toggle sort order"
+      >
+        {sortMode === "newest" ? "Newest first ↓" : "Oldest first ↑"}
+      </button>
+    </div>
+
+    <!-- Helper row -->
+    <div class="mt-[19px] flex items-center gap-[9px]">
+      <img src={externalReadingCue} alt="" class="h-3.5 w-3.5 shrink-0" />
+      <p class="text-[11px] leading-[1.5] text-[#63715f]">
+        Select a story to read the full article in a new tab.
+      </p>
+    </div>
+
+    <div class="mt-[21px]">
       {#if isLoading && feeds.length === 0}
         <!-- Initial Loading State - Skeleton Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {#each Array(6) as _, i}
-            <div class="rounded-lg overflow-hidden bg-white shadow-sm">
-              <!-- Skeleton Image -->
+        <div
+          class="grid grid-cols-1 gap-x-6 gap-y-9 md:grid-cols-2 xl:grid-cols-3"
+        >
+          {#each Array(6) as _, i (i)}
+            <div class="flex flex-col">
               <div
-                class="w-full h-48 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%]"
+                class="animate-shimmer aspect-[408/230] rounded-[10px] bg-gradient-to-r from-[#eef1e6] via-[#f6f7f1] to-[#eef1e6] bg-[length:200%_100%]"
               ></div>
-
-              <!-- Skeleton Content -->
-              <div class="p-3 space-y-3">
-                <!-- Skeleton Title -->
-                <div class="space-y-2">
-                  <div
-                    class="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded"
-                  ></div>
-                  <div
-                    class="h-4 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded w-3/4"
-                  ></div>
-                </div>
-
-                <!-- Skeleton Meta -->
-                <div class="space-y-2">
-                  <div
-                    class="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded w-1/2"
-                  ></div>
-                  <div
-                    class="h-3 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded w-1/3"
-                  ></div>
-                </div>
-
-                <!-- Skeleton Button -->
-                <div class="pt-2 border-t border-gray-100">
-                  <div
-                    class="h-7 bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-shimmer bg-[length:200%_100%] rounded w-24"
-                  ></div>
-                </div>
+              <div class="mt-4 space-y-3">
+                <div
+                  class="animate-shimmer h-4 w-3/4 rounded bg-gradient-to-r from-[#dce6d3] via-[#e8ecdf] to-[#dce6d3] bg-[length:200%_100%]"
+                ></div>
+                <div
+                  class="animate-shimmer h-3 w-1/2 rounded bg-gradient-to-r from-[#dce6d3] via-[#e8ecdf] to-[#dce6d3] bg-[length:200%_100%]"
+                ></div>
+                <div
+                  class="animate-shimmer h-3 w-1/3 rounded bg-gradient-to-r from-[#dce6d3] via-[#e8ecdf] to-[#dce6d3] bg-[length:200%_100%]"
+                ></div>
               </div>
             </div>
           {/each}
         </div>
       {:else if feeds.length === 0}
         <!-- No Feeds State -->
-        <div class="border border-[#FFD4B3] rounded-lg p-8 text-center">
+        <div class="rounded-[14px] border border-[#dce1d5] p-8 text-center">
           <div
-            class="bg-[#FFE6D5] w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2"
+            class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[#dce6d3]"
           >
-            <RefreshCw class="w-5 h-5 text-[#FF6600]" />
+            <RefreshCw class="h-5 w-5 text-[#315d43]" />
           </div>
-          <p class="text-gray-600 text-sm">No feeds yet</p>
-          <p class="text-gray-400 text-xs mt-1">
+          <p class="text-sm text-[#41553e]">No feeds yet</p>
+          <p class="mt-1 text-xs text-[#63715f]">
             Check back later for updates!
           </p>
         </div>
+      {:else if displayedFeeds.length === 0}
+        <!-- No search results -->
+        <p class="py-16 text-center text-sm text-[#63715f]">
+          No stories match your search.
+        </p>
       {:else}
-        <!-- Feed Card Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {#each feeds as feed (feed.id)}
-            <div
-              class="rounded-lg shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col bg-white"
-              style={feed.is_read ? "opacity: 0.6;" : ""}
-            >
-              <!-- Main Image on Top -->
-              <div
-                class="w-full h-48 overflow-hidden cursor-pointer relative"
-                onclick={() => openFeedLink(feed.id, feed.link)}
-                role="button"
-                tabindex="0"
-                onkeydown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    openFeedLink(feed.id, feed.link);
-                  }
-                }}
+        <!-- Story card grid -->
+        <div
+          class="grid grid-cols-1 gap-x-6 gap-y-9 md:grid-cols-2 xl:grid-cols-3"
+        >
+          {#each displayedFeeds as feed (feed.id)}
+            <article class="flex flex-col">
+              <!-- Main picture -->
+              <a
+                href={feed.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                onclick={() => markFeedRead(feed.id)}
+                class="group relative block aspect-[408/230] overflow-hidden rounded-[10px]"
+                aria-label="Open article in a new tab"
               >
                 <img
                   src={getProxiedImageUrl(feed.main_image_url)}
                   alt={feed.title || "Feed image"}
-                  class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   onerror={(e) => {
                     const target = e.currentTarget as HTMLImageElement;
                     target.src = placeholderImage;
                   }}
                 />
                 {#if feed.is_read}
-                  <div
-                    class="absolute top-2 right-2 bg-[#FF6600] text-white text-xs font-medium px-2 py-1 rounded"
+                  <span
+                    class="absolute right-3 bottom-3 rounded-[5px] bg-[#fcfbf7] px-[14px] py-[6px] text-[9px] font-medium text-[#54705a]"
                   >
-                    READ
-                  </div>
+                    Read
+                  </span>
                 {/if}
+              </a>
+
+              <!-- Source -->
+              <div class="mt-4 flex items-center gap-[9px]">
+                {#if !feed.is_read}
+                  <img
+                    src={unreadIndicator}
+                    alt=""
+                    class="h-[5px] w-[5px] shrink-0"
+                  />
+                {/if}
+                <p
+                  class="truncate text-[10px] font-semibold tracking-[0.6px] text-[#54705a] uppercase"
+                >
+                  {extractDomain(feed.link)}
+                </p>
               </div>
 
-              <!-- Card Content -->
-              <div class="p-3 flex-1 flex flex-col">
-                <!-- Title -->
+              <!-- Headline + actions -->
+              <div class="mt-[11px] flex items-start justify-between gap-3">
                 <h3
-                  class="text-base font-medium text-gray-900 mb-2 line-clamp-2 cursor-pointer hover:text-gray-600 transition-colors"
-                  onclick={() => openFeedLink(feed.id, feed.link)}
-                  role="button"
-                  tabindex="0"
-                  onkeydown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      openFeedLink(feed.id, feed.link);
-                    }
-                  }}
+                  class="line-clamp-2 min-w-0 flex-1 text-[18px] leading-[1.5] text-[#17362b] {feed.is_read
+                    ? 'font-medium'
+                    : 'font-semibold'}"
                 >
-                  {feed.title || "Untitled Feed"}
-                </h3>
-
-                <!-- Date and Source -->
-                <div class="text-xs text-gray-500 mb-2 space-y-1">
-                  <p class="flex items-center gap-1">
-                    <ExternalLink class="w-3 h-3 flex-shrink-0" />
-                    {extractDomain(feed.link)}
-                  </p>
-                  <p>{formatDate(feed.published_at)}</p>
-                </div>
-
-                <!-- Actions -->
-                <div
-                  class="pt-2 mt-auto border-t border-orange-50 flex justify-end"
-                >
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onclick={(e) => {
-                      e.stopPropagation();
-                      addBookmark(feed.link, feed.id);
-                    }}
-                    disabled={bookmarkingFeedIds.has(feed.id)}
-                    class="text-gray-600 hover:text-[#FF6600] hover:bg-[#FFE6D5] h-7 px-2 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label="Bookmark this feed"
+                  <a
+                    href={feed.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onclick={() => markFeedRead(feed.id)}
+                    class="transition-colors hover:text-[#315d43]"
                   >
-                    <Bookmark class="w-3 h-3 mr-1" />
-                    {bookmarkingFeedIds.has(feed.id) ? "Saving..." : "Bookmark"}
-                  </Button>
+                    {feed.title || "Untitled Feed"}
+                  </a>
+                </h3>
+                <div class="flex shrink-0 items-start pt-[5px] pr-0.5">
+                  <button
+                    type="button"
+                    onclick={() => addBookmark(feed.link, feed.id)}
+                    disabled={bookmarkingFeedIds.has(feed.id)}
+                    class="rounded p-1 text-[#54705A] transition-colors hover:text-[#315d43] disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="Bookmark this feed"
+                    title={bookmarkingFeedIds.has(feed.id)
+                      ? "Saving..."
+                      : "Bookmark"}
+                  >
+                    <Bookmark class="h-[17px] w-[17px]" strokeWidth={1.6} />
+                  </button>
+                  <a
+                    href={feed.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onclick={() => markFeedRead(feed.id)}
+                    class="rounded p-1"
+                    aria-label="Open in new tab"
+                  >
+                    <img
+                      src={openInNewTabIcon}
+                      alt=""
+                      class="h-[17px] w-[17px]"
+                    />
+                  </a>
                 </div>
               </div>
-            </div>
+
+              <!-- Preview -->
+              <p
+                class="mt-[10px] line-clamp-2 text-[12px] leading-[1.5] text-[#63715f]"
+              >
+                {stripHtml(feed.description)}
+              </p>
+
+              <!-- Metadata -->
+              <p class="mt-[13px] text-[10px] leading-[1.5] text-[#63715f]">
+                {formatDate(feed.published_at)}
+              </p>
+            </article>
           {/each}
         </div>
       {/if}
 
       <!-- Infinite Scroll Trigger -->
       {#if feedHasMore && feeds.length > 0 && feedNextCursor}
-        <div bind:this={scrollTrigger} class="w-full h-4"></div>
+        <div bind:this={scrollTrigger} class="h-4 w-full"></div>
       {/if}
 
       <!-- Loading Indicator -->
       {#if isLoading && feeds.length > 0}
-        <div class="flex items-center justify-center py-8 mt-4">
+        <div class="mt-4 flex items-center justify-center py-8">
           <div class="flex flex-col items-center gap-3">
-            <!-- Modern spinner with pulsing dots -->
             <div class="flex gap-2">
               <div
-                class="w-2 h-2 rounded-full bg-[#FF6600] animate-bounce [animation-delay:-0.3s]"
+                class="h-2 w-2 animate-bounce rounded-full bg-[#315d43] [animation-delay:-0.3s]"
               ></div>
               <div
-                class="w-2 h-2 rounded-full bg-[#FF6600] animate-bounce [animation-delay:-0.15s]"
+                class="h-2 w-2 animate-bounce rounded-full bg-[#315d43] [animation-delay:-0.15s]"
               ></div>
               <div
-                class="w-2 h-2 rounded-full bg-[#FF6600] animate-bounce"
+                class="h-2 w-2 animate-bounce rounded-full bg-[#315d43]"
               ></div>
             </div>
-            <span class="text-sm text-gray-500 font-medium"
+            <span class="text-sm font-medium text-[#63715f]"
               >Loading more...</span
             >
           </div>
         </div>
       {/if}
 
-      <!-- End of List Indicator -->
+      <!-- Feed footer -->
       {#if !feedHasMore && feeds.length > 0}
-        <div class="border border-[#FFD4B3] rounded-lg p-4 mt-4">
-          <div class="flex flex-col items-center gap-2">
-            <p class="text-center text-sm text-gray-500">
-              You've reached the end of your feeds
+        <div class="mt-14">
+          <div class="h-px bg-[#e0e5d8]"></div>
+          <div
+            class="mt-[18px] flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-[11px] leading-[1.5] text-[#63715f]"
+          >
+            <p>
+              All {feeds.length}
+              {feeds.length === 1 ? "story" : "stories"} from your subscriptions.
             </p>
-            <Button
-              onclick={reloadFeed}
-              disabled={isReloadingFeed}
-              class="h-8 px-3 bg-[#FF6600] hover:bg-[#FF8533] text-white rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              aria-label="Reload feed"
-            >
-              <RefreshCw
-                class={`w-4 h-4 mr-1.5 ${isReloadingFeed ? "animate-spin" : ""}`}
-              />
-              {isReloadingFeed ? "Reloading..." : "Reload Feed"}
-            </Button>
+            <div class="flex items-center gap-5">
+              <p>
+                {displayedFeeds.length} of {feeds.length}
+                {feeds.length === 1 ? "story" : "stories"}
+              </p>
+              <button
+                type="button"
+                onclick={reloadFeed}
+                disabled={isReloadingFeed}
+                class="font-medium text-[#315d43] transition-opacity hover:underline disabled:opacity-50 disabled:hover:no-underline"
+              >
+                {isReloadingFeed ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
           </div>
         </div>
       {/if}
